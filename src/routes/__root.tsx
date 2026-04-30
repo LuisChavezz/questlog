@@ -7,6 +7,7 @@ import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
+import { ThemeProvider } from '../components/providers/theme-provider'
 
 import appCss from '../styles.css?url'
 
@@ -42,12 +43,27 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="es">
       <head>
         <HeadContent />
+        {/*
+         * Script anti-FOUC: lee localStorage antes del primer render
+         * para aplicar la clase 'dark' sin parpadeo visible.
+         */}
+        {/*
+         * Script anti-FOUC: parsea el JSON que almacena Zustand persist
+         * para aplicar la clase 'dark' antes del primer render.
+         */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s=localStorage.getItem('questlog-theme');if(s){var p=JSON.parse(s);if(p&&p.state&&p.state.theme==='dark')document.documentElement.classList.add('dark');}}catch(e){}})()`,
+          }}
+        />
       </head>
       <body>
-        {children}
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
         <TanStackDevtools
           config={{
             position: 'bottom-right',
