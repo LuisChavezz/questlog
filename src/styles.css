@@ -119,6 +119,7 @@
 
 @theme inline {
   --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Fraunces', serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -343,5 +344,16 @@ a {
   body {
     background-color: var(--background);
     color: var(--foreground);
+  }
+}
+
+/* Animación flotante para los orbs del layout de autenticación */
+@keyframes auth-float {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-28px) scale(1.04);
   }
 }
