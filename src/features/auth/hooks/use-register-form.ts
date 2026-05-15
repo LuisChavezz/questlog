@@ -1,5 +1,8 @@
+import { useNavigate } from '@tanstack/react-router'
 import { useForm } from '@tanstack/react-form'
+import { useState } from 'react'
 
+import { authClient } from '#/lib/auth-client'
 import {
   emailSchema,
   nameSchema,
@@ -8,6 +11,9 @@ import {
 
 // Hook que encapsula la lógica del formulario de registro
 export function useRegisterForm() {
+  const navigate = useNavigate()
+  const [serverError, setServerError] = useState<string | null>(null)
+
   const form = useForm({
     defaultValues: {
       name: '',
@@ -16,8 +22,20 @@ export function useRegisterForm() {
       confirmPassword: '',
     },
     onSubmit: async ({ value }) => {
-      // TODO: integrar con el backend de autenticación
-      console.log('Register submitted:', value)
+      setServerError(null)
+
+      const { error } = await authClient.signUp.email({
+        email: value.email,
+        password: value.password,
+        name: value.name,
+      })
+
+      if (error) {
+        setServerError(error.message ?? 'Could not create account. Please try again.')
+        return
+      }
+
+      await navigate({ to: '/dashboard' })
     },
   })
 
@@ -52,5 +70,5 @@ export function useRegisterForm() {
     },
   }
 
-  return { form, validators }
+  return { form, validators, serverError }
 }

@@ -1,4 +1,4 @@
-// Esquema de base de datos — agregar tablas según se necesiten
+// Esquema de base de datos — tablas de la aplicación + re-exporta tablas de auth
 import { sql } from 'drizzle-orm'
 import {
   pgEnum,
@@ -7,6 +7,8 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core'
+
+export * from './auth-schema'
 
 // Enum: estado de la quest
 export const questStatusEnum = pgEnum('quest_status', [

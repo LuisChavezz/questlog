@@ -8,10 +8,10 @@ import { Label } from '#/components/ui/label'
 import { cn } from '#/lib/utils'
 import { useLoginForm } from '../hooks/use-login-form'
 
-// Página de inicio de sesión — solo UI, sin integración con backend
+// Página de inicio de sesión — integrada con Better Auth
 export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
-  const { form, validators } = useLoginForm()
+  const { form, validators, serverError } = useLoginForm()
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -158,6 +158,16 @@ export function LoginPage() {
               )
             }}
           </form.Field>
+
+          {/* Error de servidor (credenciales inválidas, etc.) */}
+          {serverError && (
+            <div
+              role="alert"
+              className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+            >
+              {serverError}
+            </div>
+          )}
 
           {/* Botón de envío */}
           <form.Subscribe

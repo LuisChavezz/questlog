@@ -8,11 +8,11 @@ import { Label } from '#/components/ui/label'
 import { cn } from '#/lib/utils'
 import { useRegisterForm } from '../hooks/use-register-form'
 
-// Página de registro — solo UI, sin integración con backend
+// Página de registro — integrada con Better Auth
 export function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
-  const { form, validators } = useRegisterForm()
+  const { form, validators, serverError } = useRegisterForm()
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -274,6 +274,16 @@ export function RegisterPage() {
               )
             }}
           </form.Field>
+
+          {/* Error de servidor (email ya registrado, etc.) */}
+          {serverError && (
+            <div
+              role="alert"
+              className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+            >
+              {serverError}
+            </div>
+          )}
 
           {/* Botón de envío */}
           <form.Subscribe

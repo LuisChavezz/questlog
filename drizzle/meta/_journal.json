@@ -15,6 +15,13 @@
       "when": 1777933677681,
       "tag": "0001_dark_tag",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778594899460,
+      "tag": "0002_plain_mole_man",
+      "breakpoints": true
     }
   ]
 }

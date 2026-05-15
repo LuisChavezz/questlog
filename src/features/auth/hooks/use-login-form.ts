@@ -1,17 +1,34 @@
+import { useNavigate } from '@tanstack/react-router'
 import { useForm } from '@tanstack/react-form'
+import { useState } from 'react'
 
+import { authClient } from '#/lib/auth-client'
 import { emailSchema, passwordSchema } from '../schemas/auth-schemas'
 
 // Hook que encapsula la lógica del formulario de inicio de sesión
 export function useLoginForm() {
+  const navigate = useNavigate()
+  const [serverError, setServerError] = useState<string | null>(null)
+
   const form = useForm({
     defaultValues: {
       email: '',
       password: '',
     },
     onSubmit: async ({ value }) => {
-      // TODO: integrar con el backend de autenticación
-      console.log('Login submitted:', value)
+      setServerError(null)
+
+      const { error } = await authClient.signIn.email({
+        email: value.email,
+        password: value.password,
+      })
+
+      if (error) {
+        setServerError(error.message ?? 'Invalid credentials. Please try again.')
+        return
+      }
+
+      await navigate({ to: '/dashboard' })
     },
   })
 
@@ -31,5 +48,5 @@ export function useLoginForm() {
     },
   }
 
-  return { form, validators }
+  return { form, validators, serverError }
 }
