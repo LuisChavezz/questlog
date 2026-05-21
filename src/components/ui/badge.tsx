@@ -18,13 +18,13 @@ const badgeVariants = cva(
         outline: 'text-foreground border-border',
         // Variantes semánticas para estados de tarea
         backlog:
-          'border-transparent bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400',
-        todo: 'border-transparent bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
+          'border-transparent bg-muted text-muted-foreground',
+        todo: 'border-transparent bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300',
         in_progress:
-          'border-transparent bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
-        done: 'border-transparent bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
+          'border-transparent bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300',
+        done: 'border-transparent bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300',
         cancelled:
-          'border-transparent bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-600 line-through',
+          'border-transparent bg-muted text-muted-foreground/60 line-through',
         // Variantes de prioridad
         low: 'border-transparent bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-400',
         medium:

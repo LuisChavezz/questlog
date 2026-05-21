@@ -20,7 +20,7 @@ export function ThemeSwitch({ isExpanded }: ThemeSwitchProps) {
         className={cn(
           'flex items-center gap-3 rounded-lg px-3 py-2.5',
           'text-sm font-medium',
-          'text-neutral-500 dark:text-neutral-400',
+          'text-sidebar-foreground/60',
           'overflow-hidden',
         )}
       >
@@ -58,8 +58,8 @@ export function ThemeSwitch({ isExpanded }: ThemeSwitchProps) {
               'cursor-pointer',
               'transition-colors duration-300',
               isDark
-                ? 'bg-neutral-800 ring-1 ring-neutral-700'
-                : 'bg-white ring-1 ring-neutral-200 shadow-sm',
+                ? 'bg-sidebar-accent ring-1 ring-sidebar-border'
+                : 'bg-background ring-1 ring-border shadow-sm',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             )}
           >

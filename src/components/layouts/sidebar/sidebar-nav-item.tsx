@@ -29,9 +29,8 @@ export function SidebarNavItem({ item, isExpanded }: SidebarNavItemProps) {
         }}
         inactiveProps={{
           className: cn(
-            'text-neutral-500 dark:text-neutral-400',
-            'hover:bg-neutral-50 hover:text-neutral-900',
-            'dark:hover:bg-neutral-800 dark:hover:text-neutral-100',
+            'text-sidebar-foreground/60',
+            'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
           ),
         }}
       >

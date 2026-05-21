@@ -9,7 +9,7 @@ export function AppLayout() {
     useSidebar()
 
   return (
-    <div className="flex h-screen overflow-hidden bg-neutral-50 dark:bg-neutral-950">
+    <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar
         isFixed={isFixed}
         isExpanded={isExpanded}

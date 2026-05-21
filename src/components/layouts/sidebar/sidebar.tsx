@@ -59,8 +59,8 @@ export function Sidebar({
         <div
           className={cn(
             'h-full flex flex-col',
-            'bg-white dark:bg-neutral-900',
-            'border-r border-neutral-100 dark:border-neutral-800',
+            'bg-sidebar',
+            'border-r border-sidebar-border',
             'overflow-hidden',
             isOverlay && 'shadow-2xl',
           )}
@@ -95,7 +95,7 @@ export function Sidebar({
           </div>
 
           {/* Separador */}
-          <div className="mx-3 h-px shrink-0 bg-neutral-100 dark:bg-neutral-800" />
+          <div className="mx-3 h-px shrink-0 bg-sidebar-border" />
 
           {/* Navegación */}
           <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2">
@@ -107,7 +107,7 @@ export function Sidebar({
           </nav>
 
           {/* Separador inferior */}
-          <div className="mx-3 h-px shrink-0 bg-neutral-100 dark:bg-neutral-800" />
+          <div className="mx-3 h-px shrink-0 bg-sidebar-border" />
 
           {/* Selector de tema premium con switch sol/luna */}
           <ThemeSwitch isExpanded={isExpanded} />
@@ -121,7 +121,7 @@ export function Sidebar({
             'absolute top-5.5 right-0 translate-x-1/2 z-50',
             'flex h-6 w-6 items-center justify-center rounded-full',
             'bg-primary text-primary-foreground',
-            'shadow-md ring-2 ring-white dark:ring-neutral-900',
+            'shadow-md ring-2 ring-sidebar',
             'hover:brightness-110 active:scale-90',
             'transition-transform duration-150',
             'cursor-pointer select-none',
