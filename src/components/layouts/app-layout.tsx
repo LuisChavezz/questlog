@@ -1,9 +1,10 @@
 import { Outlet } from '@tanstack/react-router'
 
 import { useSidebar } from '#/hooks/use-sidebar'
+import { AppHeader } from './header/app-header'
 import { Sidebar } from './sidebar/sidebar'
 
-// Layout principal de la aplicación: sidebar + área de contenido
+// Layout principal de la aplicación: sidebar + header + área de contenido
 export function AppLayout() {
   const { isFixed, isExpanded, toggle, onMouseEnter, onMouseLeave } =
     useSidebar()
@@ -18,10 +19,13 @@ export function AppLayout() {
         onMouseLeave={onMouseLeave}
       />
 
-      {/* Área de contenido principal */}
-      <main className="flex-1 min-w-0 overflow-y-auto">
-        <Outlet />
-      </main>
+      {/* Columna derecha: header sticky + área de contenido scrollable */}
+      <div className="flex flex-1 min-w-0 flex-col">
+        <AppHeader />
+        <main className="flex-1 overflow-y-auto">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }
