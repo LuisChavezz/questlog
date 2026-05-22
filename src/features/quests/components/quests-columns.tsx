@@ -47,7 +47,7 @@ const PRIORITY_META: Record<
   low: { label: 'Low', icon: ArrowDown, variant: 'low' },
   medium: { label: 'Medium', icon: MinusCircle, variant: 'medium' },
   high: { label: 'High', icon: ArrowUp, variant: 'high' },
-  urgent: { label: 'Urgent', icon: AlertCircle, variant: 'urgent' },
+  critical: { label: 'Critical', icon: AlertCircle, variant: 'critical' },
 }
 
 // ─── Columnas ─────────────────────────────────────────────────────────────────

@@ -7,6 +7,7 @@ import { Suspense } from 'react'
 import { DataTable } from '#/components/ui/data-table'
 import { questsColumns } from './quests-columns'
 import { QuestsTable } from './quests-table'
+import { CreateQuestDialog } from './create-quest-dialog'
 
 function QuestsTableSkeleton() {
   return (
@@ -29,6 +30,7 @@ export function QuestsPage() {
             Track and manage your active quests.
           </p>
         </div>
+        <CreateQuestDialog />
       </header>
 
       {/* Suspense: muestra skeleton hasta que QuestsTable termina de cargar */}

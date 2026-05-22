@@ -1,11 +1,25 @@
-// Función de servidor — obtiene todas las quests de la base de datos
+// Función de servidor — obtiene las quests del usuario autenticado
 import { createServerFn } from '@tanstack/react-start'
-import { asc } from 'drizzle-orm'
+import { getRequest } from '@tanstack/react-start/server'
+import { asc, eq } from 'drizzle-orm'
 
 import { db } from '#/db'
 import { quests } from '#/db/schema'
+import { auth } from '#/lib/auth'
 
 export const getQuests = createServerFn({ method: 'GET' }).handler(async () => {
-  const result = await db.select().from(quests).orderBy(asc(quests.createdAt))
+  const request = getRequest()
+  const session = await auth.api.getSession({ headers: request.headers })
+
+  if (!session?.user.id) {
+    throw new Error('Unauthorized: must be signed in to fetch quests')
+  }
+
+  const result = await db
+    .select()
+    .from(quests)
+    .where(eq(quests.userId, session.user.id))
+    .orderBy(asc(quests.createdAt))
+
   return result
 })

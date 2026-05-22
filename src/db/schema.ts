@@ -8,6 +8,8 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 
+import { user } from './auth-schema'
+
 export * from './auth-schema'
 
 // Enum: estado de la quest
@@ -24,12 +26,15 @@ export const questPriorityEnum = pgEnum('quest_priority', [
   'low',
   'medium',
   'high',
-  'urgent',
+  'critical',
 ])
 
 // Tabla de quests
 export const quests = pgTable('quests', {
   id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   description: text('description'),
   status: questStatusEnum('status').notNull().default('backlog'),
