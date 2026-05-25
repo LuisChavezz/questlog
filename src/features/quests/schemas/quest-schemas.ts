@@ -76,3 +76,15 @@ export const createQuestSchema = z.object({
 })
 
 export type CreateQuestValues = z.infer<typeof createQuestSchema>
+
+// Esquema para actualizar una quest desde la tabla (edición inline).
+// Todos los campos son opcionales excepto el id.
+export const updateQuestSchema = z.object({
+  id: z.string().uuid(),
+  title: questTitleSchema.optional(),
+  status: questStatusSchema.optional(),
+  priority: questPrioritySchema.optional(),
+  tags: z.array(z.string().max(50)).max(20).optional(),
+})
+
+export type UpdateQuestValues = z.infer<typeof updateQuestSchema>
