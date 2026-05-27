@@ -6,16 +6,23 @@
  */
 import type { ColumnDef } from '@tanstack/react-table'
 import {
+  Activity,
   AlertCircle,
   ArrowDown,
   ArrowRight,
   ArrowUp,
+  Calendar,
   CheckCircle2,
   Circle,
   Clock,
+  Flag,
   MinusCircle,
+  ScrollText,
+  Tag,
   XCircle,
 } from 'lucide-react'
+
+import { ColumnHeader } from '#/components/ui/data-table'
 
 import { cn } from '#/lib/utils'
 import type { Quest, QuestPriority, QuestStatus } from '#/db/schema'
@@ -63,7 +70,7 @@ export function createQuestsColumns(
     // Title + description (título editable inline)
     {
       accessorKey: 'title',
-      header: 'Quest',
+      header: () => <ColumnHeader icon={ScrollText}>Quest</ColumnHeader>,
       size: 320,
       cell: ({ row }) => {
         const { id, title, description } = row.original
@@ -86,7 +93,7 @@ export function createQuestsColumns(
     // Status (badge editable inline)
     {
       accessorKey: 'status',
-      header: 'Status',
+      header: () => <ColumnHeader icon={Activity}>Status</ColumnHeader>,
       size: 140,
       cell: ({ row }) => {
         const { id, status } = row.original
@@ -106,7 +113,7 @@ export function createQuestsColumns(
     // Priority (badge editable inline)
     {
       accessorKey: 'priority',
-      header: 'Priority',
+      header: () => <ColumnHeader icon={Flag}>Priority</ColumnHeader>,
       size: 120,
       cell: ({ row }) => {
         const { id, priority } = row.original
@@ -124,7 +131,7 @@ export function createQuestsColumns(
     // Tags (editable inline)
     {
       accessorKey: 'tags',
-      header: 'Tags',
+      header: () => <ColumnHeader icon={Tag}>Tags</ColumnHeader>,
       size: 200,
       enableSorting: false,
       cell: ({ row }) => {
@@ -141,7 +148,7 @@ export function createQuestsColumns(
     // Due date (solo lectura)
     {
       accessorKey: 'dueDate',
-      header: 'Due Date',
+      header: () => <ColumnHeader icon={Calendar}>Due Date</ColumnHeader>,
       size: 130,
       cell: ({ getValue }) => {
         const date = getValue<Date | null>()
@@ -164,7 +171,7 @@ export function createQuestsColumns(
     // Created (solo lectura)
     {
       accessorKey: 'createdAt',
-      header: 'Created',
+      header: () => <ColumnHeader icon={Clock}>Created</ColumnHeader>,
       size: 120,
       cell: ({ getValue }) => {
         const date = getValue<Date>()

@@ -143,6 +143,30 @@ export function DataTable<TData, TValue>({
   )
 }
 
+// ─── Encabezado con icono ─────────────────────────────────────────────────────
+
+interface ColumnHeaderProps {
+  /** Icono de Lucide que aparecerá a la izquierda del título. */
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
+  children: React.ReactNode
+}
+
+/**
+ * Envuelve el título de una columna con un icono semántico a la izquierda.
+ * Exportado para ser reutilizado en todas las definiciones de columnas.
+ */
+export function ColumnHeader({ icon: Icon, children }: ColumnHeaderProps) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <Icon
+        className="size-3.5 shrink-0 opacity-60"
+        aria-hidden="true"
+      />
+      {children}
+    </span>
+  )
+}
+
 // ─── Encabezado ordenable ─────────────────────────────────────────────────────
 
 interface SortableHeaderProps {
