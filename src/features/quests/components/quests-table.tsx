@@ -25,6 +25,7 @@ export function QuestsTable() {
     <DataTable
       columns={columns}
       data={quests}
+      getRowId={(quest) => quest.id}
       filterPlaceholder="Search quests..."
       defaultPageSize={10}
     />

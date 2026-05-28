@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 
 import { ColumnHeader } from '#/components/ui/data-table'
+import { Checkbox } from '#/components/ui/checkbox'
 
 import { cn } from '#/lib/utils'
 import type { Quest, QuestPriority, QuestStatus } from '#/db/schema'
@@ -67,11 +68,43 @@ export function createQuestsColumns(
   onUpdate: (data: UpdateQuestValues) => void,
 ): ColumnDef<Quest>[] {
   return [
+    {
+      id: 'select',
+      size: 44,
+      minSize: 44,
+      maxSize: 44,
+      enableSorting: false,
+      enableHiding: false,
+      enableResizing: false,
+      header: ({ table }) => (
+        <Checkbox
+          checked={
+            table.getIsAllPageRowsSelected()
+              ? true
+              : table.getIsSomePageRowsSelected()
+                ? 'indeterminate'
+                : false
+          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all rows"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label={`Select row ${row.index + 1}`}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
+    },
+
     // Title + description (título editable inline)
     {
       accessorKey: 'title',
       header: () => <ColumnHeader icon={ScrollText}>Quest</ColumnHeader>,
       size: 320,
+      minSize: 220,
       cell: ({ row }) => {
         const { id, title, description } = row.original
         return (
@@ -95,6 +128,7 @@ export function createQuestsColumns(
       accessorKey: 'status',
       header: () => <ColumnHeader icon={Activity}>Status</ColumnHeader>,
       size: 140,
+      minSize: 132,
       cell: ({ row }) => {
         const { id, status } = row.original
         return (
@@ -115,6 +149,7 @@ export function createQuestsColumns(
       accessorKey: 'priority',
       header: () => <ColumnHeader icon={Flag}>Priority</ColumnHeader>,
       size: 120,
+      minSize: 112,
       cell: ({ row }) => {
         const { id, priority } = row.original
         return (
@@ -133,6 +168,7 @@ export function createQuestsColumns(
       accessorKey: 'tags',
       header: () => <ColumnHeader icon={Tag}>Tags</ColumnHeader>,
       size: 200,
+      minSize: 160,
       enableSorting: false,
       cell: ({ row }) => {
         const { id, tags } = row.original
@@ -150,6 +186,7 @@ export function createQuestsColumns(
       accessorKey: 'dueDate',
       header: () => <ColumnHeader icon={Calendar}>Due Date</ColumnHeader>,
       size: 130,
+      minSize: 124,
       cell: ({ getValue }) => {
         const date = getValue<Date | null>()
         if (!date) return <span className="text-muted-foreground/50">—</span>
@@ -173,6 +210,7 @@ export function createQuestsColumns(
       accessorKey: 'createdAt',
       header: () => <ColumnHeader icon={Clock}>Created</ColumnHeader>,
       size: 120,
+      minSize: 112,
       cell: ({ getValue }) => {
         const date = getValue<Date>()
         return (
@@ -185,6 +223,5 @@ export function createQuestsColumns(
   ]
 }
 
-// Instancia estática sin callbacks — usada exclusivamente para el skeleton de carga
 export const questsColumns = createQuestsColumns(() => {})
 
