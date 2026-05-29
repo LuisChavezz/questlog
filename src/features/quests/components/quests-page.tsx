@@ -7,7 +7,6 @@ import { Suspense } from 'react'
 import { DataTable } from '#/components/ui/data-table'
 import { questsColumns } from './quests-columns'
 import { QuestsTable } from './quests-table'
-import { CreateQuestDialog } from './create-quest-dialog'
 
 function QuestsTableSkeleton() {
   return (
@@ -23,14 +22,11 @@ function QuestsTableSkeleton() {
 export function QuestsPage() {
   return (
     <div className="flex flex-col gap-6 p-8">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Quests</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Track and manage your active quests.
-          </p>
-        </div>
-        <CreateQuestDialog />
+      <header>
+        <h1 className="text-2xl font-semibold text-foreground">Quests</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Track and manage your active quests.
+        </p>
       </header>
 
       {/* Suspense: muestra skeleton hasta que QuestsTable termina de cargar */}

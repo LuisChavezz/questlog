@@ -42,6 +42,8 @@ interface DataTableProps<TData extends RowData, TValue> {
   getRowId?: (originalRow: TData, index: number, parent?: Row<TData>) => string
   stateStorageKey?: string
   enableColumnResizing?: boolean
+  /** Slot derecho de la toolbar: acciones como botones de creación, filtros, etc. */
+  actions?: React.ReactNode
 }
 
 interface PersistedColumnSizing {
@@ -64,6 +66,7 @@ export function DataTable<TData extends RowData, TValue>({
   getRowId,
   stateStorageKey,
   enableColumnResizing = true,
+  actions,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -157,7 +160,7 @@ export function DataTable<TData extends RowData, TValue>({
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>
-      <DataTableToolbar table={table} filterPlaceholder={filterPlaceholder} />
+      <DataTableToolbar table={table} filterPlaceholder={filterPlaceholder} actions={actions} />
 
       <div
         className="overflow-hidden rounded-xl border border-border bg-card shadow-xs"

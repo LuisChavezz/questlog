@@ -10,6 +10,7 @@ import { DataTable } from '#/components/ui/data-table'
 import { questsQueryOptions } from '../api/quests-query-options'
 import { useUpdateQuest } from '../hooks/use-update-quest'
 import { createQuestsColumns } from './quests-columns'
+import { CreateQuestDialog } from './create-quest-dialog'
 
 export function QuestsTable() {
   // useSuspenseQuery garantiza que los datos estén disponibles antes de renderizar.
@@ -28,6 +29,7 @@ export function QuestsTable() {
       getRowId={(quest) => quest.id}
       filterPlaceholder="Search quests..."
       defaultPageSize={10}
+      actions={<CreateQuestDialog />}
     />
   )
 }
