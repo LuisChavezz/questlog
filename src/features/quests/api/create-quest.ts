@@ -5,7 +5,10 @@ import { getRequest } from '@tanstack/react-start/server'
 import { db } from '#/db'
 import { quests } from '#/db/schema'
 import { auth } from '#/lib/auth'
-import { createQuestSchema } from '../schemas/quest-schemas'
+import {
+  createQuestSchema,
+  parseQuestDueDateValue,
+} from '../schemas/quest-schemas'
 
 export const createQuest = createServerFn({ method: 'POST' })
   .inputValidator(createQuestSchema)
@@ -27,7 +30,7 @@ export const createQuest = createServerFn({ method: 'POST' })
       : []
 
     // Transformar dueDate de string a Date si está presente
-    const dueDate = data.dueDate ? new Date(data.dueDate) : null
+    const dueDate = parseQuestDueDateValue(data.dueDate ?? '')
 
     const [quest] = await db
       .insert(quests)

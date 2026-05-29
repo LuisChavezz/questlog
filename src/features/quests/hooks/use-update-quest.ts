@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import type { Quest } from '#/db/schema'
 import { updateQuest } from '../api/update-quest'
+import { parseQuestDueDateValue } from '../schemas/quest-schemas'
 import type { UpdateQuestValues } from '../schemas/quest-schemas'
 
 export function useUpdateQuest() {
@@ -33,6 +34,9 @@ export function useUpdateQuest() {
             }),
             ...(variables.priority !== undefined && { priority: variables.priority }),
             ...(variables.tags !== undefined && { tags: variables.tags }),
+            ...(variables.dueDate !== undefined && {
+              dueDate: parseQuestDueDateValue(variables.dueDate),
+            }),
           }
         }),
       )

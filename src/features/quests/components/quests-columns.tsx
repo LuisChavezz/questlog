@@ -25,12 +25,12 @@ import {
 import { ColumnHeader } from '#/components/ui/data-table'
 import { Checkbox } from '#/components/ui/checkbox'
 
-import { cn } from '#/lib/utils'
 import type { Quest, QuestPriority, QuestStatus } from '#/db/schema'
 import type { UpdateQuestValues } from '../schemas/quest-schemas'
 import { InlineEditTitle } from './inline-edit-title'
 import type { BadgeOption } from './inline-edit-badge'
 import { InlineEditBadge } from './inline-edit-badge'
+import { InlineEditDueDate } from './inline-edit-due-date'
 import { InlineEditTags } from './inline-edit-tags'
 
 // ─── Utilidad de formato de fecha ─────────────────────────────────────────────
@@ -181,26 +181,19 @@ export function createQuestsColumns(
       },
     },
 
-    // Due date (solo lectura)
+    // Due date (editable inline)
     {
       accessorKey: 'dueDate',
       header: () => <ColumnHeader icon={Calendar}>Due Date</ColumnHeader>,
       size: 130,
       minSize: 124,
-      cell: ({ getValue }) => {
-        const date = getValue<Date | null>()
-        if (!date) return <span className="text-muted-foreground/50">—</span>
-        const d = new Date(date)
-        const isOverdue = d < new Date()
+      cell: ({ row }) => {
+        const { id, dueDate } = row.original
         return (
-          <span
-            className={cn(
-              'text-sm tabular-nums',
-              isOverdue ? 'text-destructive' : 'text-muted-foreground',
-            )}
-          >
-            {dateFormatter.format(d)}
-          </span>
+          <InlineEditDueDate
+            value={dueDate}
+            onSave={(newDueDate) => onUpdate({ id, dueDate: newDueDate })}
+          />
         )
       },
     },

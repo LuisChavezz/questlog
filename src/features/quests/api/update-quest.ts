@@ -6,7 +6,10 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '#/db'
 import { quests } from '#/db/schema'
 import { auth } from '#/lib/auth'
-import { updateQuestSchema } from '../schemas/quest-schemas'
+import {
+  parseQuestDueDateValue,
+  updateQuestSchema,
+} from '../schemas/quest-schemas'
 
 export const updateQuest = createServerFn({ method: 'POST' })
   .inputValidator(updateQuestSchema)
@@ -38,6 +41,10 @@ export const updateQuest = createServerFn({ method: 'POST' })
 
     if (data.tags !== undefined) {
       updatePayload.tags = data.tags
+    }
+
+    if (data.dueDate !== undefined) {
+      updatePayload.dueDate = parseQuestDueDateValue(data.dueDate)
     }
 
     if (Object.keys(updatePayload).length === 0) {
