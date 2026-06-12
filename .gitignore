@@ -31,3 +31,6 @@ pnpm-debug.log*
 
 # Tooling artifacts
 .cta.json
+
+# AI Agents
+.agents/

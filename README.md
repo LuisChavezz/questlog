@@ -1,247 +1,312 @@
-Welcome to your new TanStack Start app! 
+# Questlog
 
-# Getting Started
+A modern task management application built with the TanStack ecosystem. Think of each task as a "quest" — track, prioritize, and complete your work with an intuitive interface inspired by tools like Notion and Linear.
 
-To run this application:
+---
+
+## Features
+
+- **Authentication** — Register, login, and session management powered by Better Auth with email/password authentication.
+- **Quests Table** — Full-featured data table with sorting, filtering, pagination, column resizing, and inline editing.
+- **Inline Editing** — Edit quest titles, status, priority, tags, and due dates directly from the table rows.
+- **Row Selection** — Notion-style checkbox visibility (appears on row hover or when selected) with bulk action support.
+- **Bulk Actions** — Select multiple quests and apply status or priority changes in one click. Extensible for future actions.
+- **Dark Mode** — Full dark/light theme toggle persisted via Zustand with a Nord color palette.
+- **Collapsible Sidebar** — Fixed expand/collapse with overlay hover mode.
+
+---
+
+## Tech Stack
+
+| Layer            | Technology                                                                                   |
+| ---------------- | -------------------------------------------------------------------------------------------- |
+| **Framework**    | [TanStack Start](https://tanstack.com/start/latest) (SSR)                                    |
+| **UI Library**   | React 19                                                                                     |
+| **Language**     | TypeScript 6.0                                                                               |
+| **Routing**      | [TanStack Router](https://tanstack.com/router/latest) with file-based routes                 |
+| **Data Fetching**| [TanStack Query](https://tanstack.com/query/latest)                                          |
+| **Tables**       | [TanStack Table](https://tanstack.com/table/latest)                                          |
+| **Forms**        | [TanStack Form](https://tanstack.com/form/latest)                                            |
+| **ORM**          | [Drizzle ORM](https://orm.drizzle.team) with PostgreSQL                                      |
+| **Auth**         | [Better Auth](https://www.better-auth.com)                                                   |
+| **Validation**   | [Zod](https://zod.dev)                                                                       |
+| **Styling**      | [Tailwind CSS v4](https://tailwindcss.com) + [Radix UI](https://www.radix-ui.com) primitives |
+| **State**        | [Zustand](https://github.com/pmndrs/zustand) (theme persistence)                             |
+| **Icons**        | [Lucide](https://lucide.dev)                                                                 |
+| **Tooling**      | Vite, ESLint, Prettier, Vitest                                                               |
+
+---
+
+## Architecture
+
+```
+src/
+├── components/          # Shared UI components
+│   ├── layouts/         # App layout, auth layout, sidebar, header
+│   ├── providers/       # Theme provider
+│   └── ui/              # Radix-based component library (shadcn-style)
+├── config/              # Navigation items configuration
+├── db/                  # Database schema, client, seed script
+│   ├── auth-schema.ts   # Better Auth tables (user, session, account, verification)
+│   ├── schema.ts        # Quest table + enums + re-exports auth schema
+│   ├── index.ts         # Drizzle client
+│   └── seed.ts          # Test data seeder
+├── features/            # Domain modules (feature-sliced)
+│   ├── auth/            # Login, register, schemas, hooks
+│   ├── dashboard/       # Dashboard page (placeholder)
+│   └── quests/          # Quests CRUD, table, inline editors, bulk actions
+├── hooks/               # Shared hooks (use-sidebar)
+├── integrations/        # TanStack Query setup (SSR, devtools)
+├── lib/                 # Shared utilities
+│   ├── auth.ts          # Better Auth server config
+│   ├── auth-client.ts   # Better Auth browser client
+│   ├── server/session.ts# Server function to read session
+│   └── utils.ts         # cn() helper (clsx + tailwind-merge)
+├── routes/              # File-based TanStack Router routes
+│   ├── __root.tsx       # Root layout, SEO, anti-FOUC script
+│   ├── index.tsx        # Redirect / → /dashboard
+│   ├── _auth.tsx        # Guest layout (redirects to dashboard if logged in)
+│   ├── _auth/login.tsx  # Login page
+│   ├── _auth/register.tsx# Register page
+│   ├── _app.tsx         # Protected layout (redirects to login if not authenticated)
+│   ├── _app/dashboard.tsx
+│   ├── _app/quests.tsx  # Quests page with SSR data preload
+│   └── api/auth/$       # Better Auth API handler (catch-all)
+├── stores/              # Zustand stores (theme)
+├── router.tsx           # Router factory (SSR + Query integration)
+├── routeTree.gen.ts     # Auto-generated route tree
+└── styles.css           # Global styles, Nord palette, Tailwind imports
+```
+
+### Route Design
+
+| Path              | Layout    | Auth Required | Description            |
+| ----------------- | --------- | ------------- | ---------------------- |
+| `/`               | None      | —             | Redirects to dashboard |
+| `/login`          | `_auth`   | No            | Sign in                |
+| `/register`       | `_auth`   | No            | Create account         |
+| `/dashboard`      | `_app`    | Yes           | Dashboard overview     |
+| `/quests`         | `_app`    | Yes           | Quest management table |
+| `/api/auth/$`     | None      | —             | Better Auth API        |
+
+### Authentication Flow
+
+- Better Auth is configured with a Drizzle (PostgreSQL) adapter and email/password strategy.
+- Server-side session validation uses `getServerSession()` — a `createServerFn` that reads cookies and returns the session.
+- Route guards in `_auth.tsx` and `_app.tsx` run `beforeLoad` on the server to redirect unauthenticated/authenticated users appropriately.
+- The client-side auth client (`auth-client.ts`) dynamically resolves `baseURL` from `window.location.origin`.
+- Logout clears the TanStack Query cache and invalidates the router to force re-evaluation of guards.
+
+---
+
+## Project Structure
+
+```
+questlog/
+├── public/                  # Static assets
+├── drizzle/                 # Drizzle Kit migrations (auto-generated)
+│   ├── 0000_*.sql
+│   ├── 0001_*.sql
+│   └── meta/                # Migration snapshots
+├── src/
+│   ├── components/
+│   │   ├── layouts/
+│   │   │   ├── app-layout.tsx
+│   │   │   ├── auth-layout.tsx
+│   │   │   ├── header/
+│   │   │   └── sidebar/
+│   │   ├── providers/
+│   │   └── ui/              # 18 Radix-based components
+│   ├── features/
+│   │   ├── auth/
+│   │   ├── dashboard/
+│   │   └── quests/          # CRUD, hooks, schemas, inline editors
+│   └── routes/              # TanStack Router file-based routes
+├── components.json          # shadcn/ui configuration
+├── drizzle.config.ts        # Drizzle Kit configuration
+├── eslint.config.js
+├── prettier.config.js
+├── tsconfig.json
+└── vite.config.ts
+```
+
+---
+
+## Installation
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org) >= 20
+- [pnpm](https://pnpm.io) (recommended) or npm
+- PostgreSQL database
+
+### Setup
 
 ```bash
-npm install
-npm run dev
+# Install dependencies
+pnpm install
+
+# Copy environment variables
+cp .env.example .env.local
+
+# Edit .env.local with your database connection string and auth secrets
+
+# Run database migrations
+pnpm db:migrate
+
+# (Optional) Seed the database with a test user
+pnpm db:seed
+
+# Start the development server
+pnpm dev
 ```
 
-# Building For Production
+The app will be available at `http://localhost:3000`.
 
-To build this application for production:
+---
+
+## Environment Variables
+
+| Variable              | Required | Default                | Description                         |
+| --------------------- | -------- | ---------------------- | ----------------------------------- |
+| `DATABASE_URL`        | Yes      | —                      | PostgreSQL connection string        |
+| `BETTER_AUTH_SECRET`  | Yes      | —                      | Secret key for auth token signing   |
+| `BETTER_AUTH_URL`     | No       | `http://localhost:3000`| Base URL of the application         |
+
+Generate a strong auth secret with:
 
 ```bash
-npm run build
+npx -y @better-auth/cli secret
 ```
 
-## Testing
+---
 
-This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
+## Available Scripts
+
+| Script             | Description                                  |
+| ------------------ | -------------------------------------------- |
+| `pnpm dev`         | Start development server on port 3000        |
+| `pnpm build`       | Build for production                         |
+| `pnpm preview`     | Preview production build                     |
+| `pnpm test`        | Run tests with Vitest                        |
+| `pnpm lint`        | Lint all files with ESLint                   |
+| `pnpm format`      | Format code (Prettier) and fix lint errors   |
+| `pnpm check`       | Check formatting with Prettier               |
+| `pnpm db:generate` | Generate a new Drizzle Kit migration         |
+| `pnpm db:migrate`  | Apply pending migrations                     |
+| `pnpm db:push`     | Push schema changes directly (dev only)      |
+| `pnpm db:pull`     | Pull database schema into Drizzle files      |
+| `pnpm db:studio`   | Open Drizzle Studio (GUI database browser)   |
+| `pnpm db:seed`     | Seed database with test data                 |
+
+---
+
+## Database
+
+The project uses **PostgreSQL** with **Drizzle ORM** for type-safe database access.
+
+### Schema
+
+- **Auth tables** (`auth-schema.ts`) — `user`, `session`, `account`, `verification`. Managed by Better Auth; do not modify directly.
+- **Quest table** (`schema.ts`) — `quests` with fields:
+  - `id` (UUID, auto-generated)
+  - `user_id` (FK → user, cascade delete)
+  - `title`, `description`
+  - `status` (enum: `backlog`, `todo`, `in_progress`, `done`, `cancelled`)
+  - `priority` (enum: `low`, `medium`, `high`, `critical`)
+  - `tags` (text array)
+  - `due_date`, `completed_at`
+  - `created_at`, `updated_at` (with auto-timestamps)
+
+### Migrations and Seeders
 
 ```bash
-npm run test
+# Generate a new migration after schema changes
+pnpm db:generate
+
+# Apply migrations
+pnpm db:migrate
+
+# Seed test data (creates a test user)
+pnpm db:seed
 ```
 
-## Styling
+The seed script creates a user with:
+- Email: `test@questlog.dev`
+- Password: `Test1234!`
+- Name: `Test User`
 
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+> **Note:** The seed script uses `dotenv` to load environment variables before dynamically importing the Better Auth configuration.
 
-### Removing Tailwind CSS
+---
 
-If you prefer not to use Tailwind CSS:
+## Authentication
 
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Uninstall the packages: `npm install @tailwindcss/vite tailwindcss -D`
+Authentication is handled by **[Better Auth](https://www.better-auth.com)** with:
 
-## Linting & Formatting
+- **Email/password** strategy
+- **Drizzle adapter** for PostgreSQL
+- **TanStack Start cookies** plugin for SSR-compatible session management
+- **Shared Zod schemas** for client and server-side validation
 
+### Key files
 
-This project uses [eslint](https://eslint.org/) and [prettier](https://prettier.io/) for linting and formatting. Eslint is configured using [tanstack/eslint-config](https://tanstack.com/config/latest/docs/eslint). The following scripts are available:
+| File                        | Purpose                               |
+| --------------------------- | ------------------------------------- |
+| `src/lib/auth.ts`           | Server-side Better Auth configuration |
+| `src/lib/auth-client.ts`    | Browser-side auth client              |
+| `src/lib/server/session.ts` | Server function to retrieve session   |
+| `src/features/auth/`        | Login/register forms, hooks, schemas  |
+| `src/db/auth-schema.ts`     | Drizzle table definitions for auth    |
+
+---
+
+## Development Conventions
+
+- **Path aliases** — `#/` maps to `src/` (configured in `tsconfig.json` and `vite.config.ts`).
+- **Feature structure** — Domain logic lives in `src/features/<name>/` with subdirectories: `components/`, `hooks/`, `schemas/`, `api/`.
+- **UI components** — Radix-based primitives in `src/components/ui/`, styled with Tailwind CSS v4 and CVA variants.
+- **Tailwind classes** — Always use CSS variable tokens (`bg-background`, `text-foreground`, `border-border`, etc.) over hardcoded colors.
+- **Color system** — [Nord palette](https://www.nordtheme.com/) with CSS custom properties for light and dark themes.
+- **Icons** — Lucide React icons, imported individually for tree-shaking.
+- **Forms** — TanStack Form with field-level Zod validation, not uncontrolled forms.
+- **Data mutations** — TanStack Query `useMutation` with optimistic updates and rollback on error.
+- **Linting** — ESLint with `@tanstack/eslint-config`. Formatting with Prettier (no semicolons, single quotes, trailing commas).
+
+---
+
+## Deployment
+
+### Build
 
 ```bash
-npm run lint
-npm run format
-npm run check
+pnpm build
 ```
 
+The output is a production-ready build suitable for deployment to any Node.js hosting platform (Vercel, Netlify, Railway, Fly.io, etc.).
 
-## Shadcn
+### Environment
 
-Add components using the latest version of [Shadcn](https://ui.shadcn.com/).
+Ensure the following environment variables are set in production:
 
-```bash
-pnpm dlx shadcn@latest add button
-```
+- `DATABASE_URL`
+- `BETTER_AUTH_SECRET`
+- `BETTER_AUTH_URL`
 
+---
 
-## Setting up Better Auth
+## Troubleshooting
 
-1. Generate and set the `BETTER_AUTH_SECRET` environment variable in your `.env.local`:
+| Problem                          | Solution                                                             |
+| -------------------------------- | -------------------------------------------------------------------- |
+| `Invalid origin` on auth         | Set `BETTER_AUTH_URL` to the correct deployment URL                  |
+| Migrations fail                  | Ensure `DATABASE_URL` points to a reachable PostgreSQL instance      |
+| Fonts not loading                | The app loads Fraunces + Manrope from Google Fonts — check network   |
+| Dark mode flashes on load        | The anti-FOUC script in `__root.tsx` reads Zustand's persisted theme |
+| Build fails with import errors   | Run `pnpm install` and ensure all dependencies are in `package.json` |
 
-   ```bash
-   npx -y @better-auth/cli secret
-   ```
+---
 
-2. Visit the [Better Auth documentation](https://www.better-auth.com) to unlock the full potential of authentication in your app.
+## License
 
-### Adding a Database (Optional)
-
-Better Auth can work in stateless mode, but to persist user data, add a database:
-
-```typescript
-// src/lib/auth.ts
-import { betterAuth } from "better-auth";
-import { Pool } from "pg";
-
-export const auth = betterAuth({
-  database: new Pool({
-    connectionString: process.env.DATABASE_URL,
-  }),
-  // ... rest of config
-});
-```
-
-Then run migrations:
-
-```bash
-npx -y @better-auth/cli migrate
-```
-
-
-
-## Routing
-
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-  
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-  
-  return <div>Server time: {time}</div>
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
-
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-# Demo files
-
-Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
+MIT
