@@ -18,6 +18,7 @@ import { Input } from '#/components/ui/input'
 interface DataTableToolbarProps<TData> {
   table: Table<TData>
   filterPlaceholder?: string
+  leadingContent?: ReactNode
   /** Slot derecho: acciones como botones de creación, filtros, etc. */
   actions?: ReactNode
 }
@@ -25,6 +26,7 @@ interface DataTableToolbarProps<TData> {
 export function DataTableToolbar<TData>({
   table,
   filterPlaceholder = 'Filter...',
+  leadingContent,
   actions,
 }: DataTableToolbarProps<TData>) {
   const [searchOpen, setSearchOpen] = useState(
@@ -67,17 +69,33 @@ export function DataTableToolbar<TData>({
 
   return (
     <div className="flex min-h-9 items-center gap-3">
-      <div className="flex min-w-0 flex-1 items-center">
-        <span
+      <div className="relative flex min-h-8 min-w-0 flex-1 items-center">
+        <div
           className={cn(
-            'truncate text-xs text-muted-foreground transition-opacity duration-150',
-            hasActiveFilter ? 'opacity-100' : 'pointer-events-none opacity-0',
+            'flex min-w-0 flex-1 items-center transition-opacity duration-150 ease-out',
+            leadingContent ? 'pointer-events-none absolute inset-0 opacity-0' : 'opacity-100',
           )}
-          aria-live="polite"
-          aria-atomic="true"
         >
-          {resultCount} {resultCount === 1 ? 'result' : 'results'}
-        </span>
+          <span
+            className={cn(
+              'truncate text-xs text-muted-foreground transition-opacity duration-150',
+              hasActiveFilter ? 'opacity-100' : 'pointer-events-none opacity-0',
+            )}
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {resultCount} {resultCount === 1 ? 'result' : 'results'}
+          </span>
+        </div>
+
+        <div
+          className={cn(
+            'flex min-w-0 flex-1 items-center transition-opacity duration-150 ease-out',
+            leadingContent ? 'opacity-100' : 'pointer-events-none absolute inset-0 opacity-0',
+          )}
+        >
+          {leadingContent}
+        </div>
       </div>
 
       <div className="ml-auto flex items-center gap-2">
@@ -141,7 +159,7 @@ export function DataTableToolbar<TData>({
 
         {actions && (
           <div className="flex items-center gap-2">
-          {actions}
+            {actions}
           </div>
         )}
       </div>

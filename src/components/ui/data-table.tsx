@@ -26,6 +26,15 @@ import {
 } from '@tanstack/react-table'
 import { ChevronDown, ChevronUp, ChevronsUpDown } from 'lucide-react'
 
+import {
+  DataTableBulkActionsBar,
+  DATA_TABLE_SELECTION_PRESERVE_ATTR,
+  getDataTableSelectionBoundaryProps,
+} from '#/components/ui/data-table-bulk-actions'
+import type {
+  DataTableBulkAction,
+  DataTableSelectionBoundaryProps,
+} from '#/components/ui/data-table-bulk-actions'
 import { DataTablePagination } from '#/components/ui/data-table-pagination'
 import { DataTableSkeleton } from '#/components/ui/data-table-skeleton'
 import { DataTableToolbar } from '#/components/ui/data-table-toolbar'
@@ -42,6 +51,7 @@ interface DataTableProps<TData extends RowData, TValue> {
   getRowId?: (originalRow: TData, index: number, parent?: Row<TData>) => string
   stateStorageKey?: string
   enableColumnResizing?: boolean
+  bulkActions?: DataTableBulkAction<TData>[]
   /** Slot derecho de la toolbar: acciones como botones de creación, filtros, etc. */
   actions?: React.ReactNode
 }
@@ -53,6 +63,7 @@ interface PersistedColumnSizing {
 interface HeaderCellProps<TData extends RowData> {
   header: Header<TData, unknown>
   table: Table<TData>
+  selectionBoundaryProps?: DataTableSelectionBoundaryProps
 }
 
 export function DataTable<TData extends RowData, TValue>({
@@ -66,6 +77,7 @@ export function DataTable<TData extends RowData, TValue>({
   getRowId,
   stateStorageKey,
   enableColumnResizing = true,
+  bulkActions = [],
   actions,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
@@ -77,6 +89,10 @@ export function DataTable<TData extends RowData, TValue>({
   const [isLayoutHydrated, setIsLayoutHydrated] = React.useState(!stateStorageKey)
 
   const leafColumnIds = React.useMemo(() => getLeafColumnIds(columns), [columns])
+  const selectionBoundaryProps = React.useMemo(
+    () => getDataTableSelectionBoundaryProps(),
+    [],
+  )
 
   const handleRowSelectionChange = React.useCallback(
     (updater: React.SetStateAction<RowSelectionState>) => {
@@ -88,6 +104,10 @@ export function DataTable<TData extends RowData, TValue>({
     },
     [onRowSelectionChange],
   )
+
+  const clearRowSelection = React.useCallback(() => {
+    handleRowSelectionChange({})
+  }, [handleRowSelectionChange])
 
   React.useEffect(() => {
     setColumnSizing((current) => {
@@ -157,10 +177,69 @@ export function DataTable<TData extends RowData, TValue>({
   const visibleColumnCount = Math.max(table.getVisibleLeafColumns().length, 1)
   const tableWidth = Math.max(table.getTotalSize(), 0)
   const isResizing = Boolean(table.getState().columnSizingInfo.isResizingColumn)
+  const selectedRows = table.getSelectedRowModel().rows
+  const selectedCount = selectedRows.length
+  const bulkActionContext = React.useMemo(
+    () => ({
+      table,
+      rows: selectedRows,
+      items: selectedRows.map((row) => row.original),
+      selectedCount,
+      clearSelection: clearRowSelection,
+      selectionBoundaryProps,
+    }),
+    [clearRowSelection, selectedCount, selectedRows, selectionBoundaryProps, table],
+  )
+  const toolbarLeadingContent = selectedCount > 0 ? (
+    <DataTableBulkActionsBar
+      actions={bulkActions}
+      actionContext={bulkActionContext}
+      className="max-w-full"
+    />
+  ) : undefined
+
+  React.useEffect(() => {
+    if (selectedCount === 0 || typeof document === 'undefined') {
+      return
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target
+
+      if (!(target instanceof Element)) {
+        return
+      }
+
+      if (target.closest(`[${DATA_TABLE_SELECTION_PRESERVE_ATTR}]`)) {
+        return
+      }
+
+      clearRowSelection()
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        clearRowSelection()
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown, true)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [clearRowSelection, selectedCount])
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>
-      <DataTableToolbar table={table} filterPlaceholder={filterPlaceholder} actions={actions} />
+      <DataTableToolbar
+        table={table}
+        filterPlaceholder={filterPlaceholder}
+        leadingContent={toolbarLeadingContent}
+        actions={actions}
+      />
 
       <div
         className="overflow-hidden rounded-xl border border-border bg-card shadow-xs"
@@ -182,6 +261,7 @@ export function DataTable<TData extends RowData, TValue>({
                       key={header.id}
                       header={header}
                       table={table}
+                      selectionBoundaryProps={selectionBoundaryProps}
                     />
                   ))}
                 </tr>
@@ -199,7 +279,7 @@ export function DataTable<TData extends RowData, TValue>({
                   <tr
                     key={row.id}
                     data-state={row.getIsSelected() ? 'selected' : undefined}
-                    className="border-b border-border transition-colors last:border-0 hover:bg-muted/30 data-[state=selected]:bg-primary/5"
+                    className="group/row border-b border-border transition-colors last:border-0 hover:bg-muted/30 data-[state=selected]:bg-primary/5"
                   >
                     {row.getVisibleCells().map((cell) => (
                       <td
@@ -210,7 +290,17 @@ export function DataTable<TData extends RowData, TValue>({
                         )}
                         style={{ width: cell.column.getSize() }}
                       >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        {isSelectionColumn(cell.column.id) ? (
+                          <SelectionVisibilityContainer
+                            isVisible={row.getIsSelected()}
+                            boundaryProps={selectionBoundaryProps}
+                            revealOnHoverClassName="group-hover/row:opacity-100 group-hover/row:pointer-events-auto"
+                          >
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </SelectionVisibilityContainer>
+                        ) : (
+                          flexRender(cell.column.columnDef.cell, cell.getContext())
+                        )}
                       </td>
                     ))}
                   </tr>
@@ -255,6 +345,7 @@ export function ColumnHeader({ icon: Icon, children }: ColumnHeaderProps) {
 function DataTableHeaderCell<TData extends RowData>({
   header,
   table,
+  selectionBoundaryProps,
 }: HeaderCellProps<TData>) {
   return (
     <th
@@ -264,6 +355,7 @@ function DataTableHeaderCell<TData extends RowData>({
       <HeaderCellInner
         header={header}
         table={table}
+        selectionBoundaryProps={selectionBoundaryProps}
       />
     </th>
   )
@@ -272,10 +364,23 @@ function DataTableHeaderCell<TData extends RowData>({
 function HeaderCellInner<TData extends RowData>({
   header,
   table,
+  selectionBoundaryProps,
 }: HeaderCellProps<TData>) {
   if (header.isPlaceholder) {
     return null
   }
+
+  const isSelectColumn = isSelectionColumn(header.column.id)
+  const hasSelectedRows = hasTableSelection(table)
+  const headerContent = (
+    <SortableHeader
+      canSort={header.column.getCanSort()}
+      isSorted={header.column.getIsSorted()}
+      onSort={header.column.getToggleSortingHandler()}
+    >
+      {flexRender(header.column.columnDef.header, header.getContext())}
+    </SortableHeader>
+  )
 
   return (
     <div
@@ -285,13 +390,17 @@ function HeaderCellInner<TData extends RowData>({
       )}
     >
       <div className={cn('min-w-0 flex-1', header.column.id === 'select' && 'flex justify-center')}>
-        <SortableHeader
-          canSort={header.column.getCanSort()}
-          isSorted={header.column.getIsSorted()}
-          onSort={header.column.getToggleSortingHandler()}
-        >
-          {flexRender(header.column.columnDef.header, header.getContext())}
-        </SortableHeader>
+        {isSelectColumn ? (
+          <SelectionVisibilityContainer
+            isVisible={hasSelectedRows}
+            boundaryProps={selectionBoundaryProps}
+            revealOnHoverClassName="group-hover/select-header:opacity-100 group-hover/select-header:pointer-events-auto"
+          >
+            {headerContent}
+          </SelectionVisibilityContainer>
+        ) : (
+          headerContent
+        )}
       </div>
 
       {header.column.getCanResize() ? (
@@ -361,6 +470,37 @@ interface SortableHeaderProps {
   children: React.ReactNode
 }
 
+interface SelectionVisibilityContainerProps {
+  isVisible: boolean
+  boundaryProps?: DataTableSelectionBoundaryProps
+  revealOnHoverClassName: string
+  children: React.ReactNode
+}
+
+function SelectionVisibilityContainer({
+  isVisible,
+  boundaryProps,
+  revealOnHoverClassName,
+  children,
+}: SelectionVisibilityContainerProps) {
+  return (
+    <div
+      {...boundaryProps}
+      className={cn(
+        'flex w-full items-center justify-center transition-opacity duration-150 ease-out motion-reduce:transition-none',
+        isVisible
+          ? 'opacity-100 pointer-events-auto'
+          : cn(
+            'opacity-0 pointer-events-none focus-within:opacity-100 focus-within:pointer-events-auto',
+            revealOnHoverClassName,
+          ),
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
 function SortableHeader({
   canSort,
   isSorted,
@@ -393,8 +533,17 @@ function SortableHeader({
 function getHeaderCellClassName(columnId: string) {
   return cn(
     'relative py-3 align-middle font-medium text-muted-foreground whitespace-nowrap',
+    isSelectionColumn(columnId) && 'group/select-header',
     columnId === 'select' ? 'px-3 text-center' : 'px-4 text-left',
   )
+}
+
+function isSelectionColumn(columnId: string) {
+  return columnId === 'select'
+}
+
+function hasTableSelection<TData extends RowData>(table: Table<TData>) {
+  return Object.keys(table.getState().rowSelection).length > 0
 }
 
 function getLeafColumnIds<TData extends RowData, TValue>(
