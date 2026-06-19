@@ -7,109 +7,127 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Paleta Nord — https://www.nordtheme.com/
+ * Paleta Claude (Anthropic) — grises cálidos + acento violeta.
  *
- * Polar Night  (fondos oscuros): #2E3440 · #3B4252 · #434C5E · #4C566A
- * Snow Storm   (fondos claros):  #D8DEE9 · #E5E9F0 · #ECEFF4
- * Frost        (acentos azules): #8FBCBB · #88C0D0 · #81A1C1 · #5E81AC
- * Aurora       (semánticos):     #BF616A · #D08770 · #EBCB8B · #A3BE8C · #B48EAD
+ * El acento naranja/coral característico de Claude se sustituye por violeta:
+ *   Violet 600 #9333EA (primario) · Violet 700 #7E22CE (hover)
+ *   Violet 200 #DDD6FE (bordes)   · Violet 50  #F3E8FF (fondos sutiles)
+ *
+ * Neutros cálidos (estilo Claude):
+ *   Claro:   #FAF9F5 (crema) · #F0EEE6 · #E8E5DA · #1F1E1D (tinta) · #73726C
+ *   Oscuro:  #262624 · #30302E · #3A3A37 · #F5F4EE · #A8A69C
+ * Semánticos: rojo #DC2626 / verde #16A34A (errores / éxito).
  */
 
 :root {
-  /* ── Nord: tokens semánticos de la app (tema claro) ── */
-  --nord-bg-base:        #ECEFF4; /* Snow Storm 3 — fondo principal */
-  --nord-surface:        #E5E9F0; /* Snow Storm 2 — superficies */
-  --nord-surface-strong: #D8DEE9; /* Snow Storm 1 — bordes / elevados */
-  --nord-text:           #2E3440; /* Polar Night 1 — texto principal */
-  --nord-text-soft:      #4C566A; /* Polar Night 4 — texto secundario */
-  --nord-accent:         #5E81AC; /* Frost 4 — acento primario */
-  --nord-frost:          #88C0D0; /* Frost 2 — highlight */
-  --nord-line:           rgba(46, 52, 64, 0.12);
-  --hero-a:              rgba(94, 129, 172, 0.14); /* Frost 4 tint */
-  --hero-b:              rgba(136, 192, 208, 0.09); /* Frost 2 tint */
+  /* ── Claude (VSCode theme): tokens semánticos de la app (tema claro) ── */
+  --nord-bg-base:        #FAF9F5; /* Crema cálida — fondo principal */
+  --nord-surface:        #F0EEE6; /* Beige cálido — superficies */
+  --nord-surface-strong: #E8E5DA; /* Beige fuerte — elevados */
+  --nord-text:           #1F1E1D; /* Tinta cálida — texto principal */
+  --nord-text-soft:      #6B6A62; /* Gris cálido — texto secundario */
+  --nord-accent:         #9333EA; /* Violet 600 — acento (enlaces) */
+  --nord-frost:          #7E22CE; /* Violet 700 — highlight / hover */
+  --nord-line:           rgba(31, 30, 29, 0.10); /* Divisor neutro cálido */
+  --hero-a:              rgba(255, 253, 247, 0.60); /* Brillo blanco cálido */
+  --hero-b:              rgba(240, 238, 230, 0.50); /* Brillo beige cálido */
+
+  /* ── Tokens de marca (páginas de auth) — violeta interactivo ── */
+  --lagoon:              #9333EA; /* Violet 600 */
+  --lagoon-deep:         #7E22CE; /* Violet 700 */
+  --palm:                #7E22CE; /* Violet 700 — fin del degradado */
+  --sea-ink:             #1F1E1D; /* Tinta — texto de marca */
 
   /* ── Tokens shadcn/ui (tema claro) ── */
-  --background:              #ECEFF4;
-  --foreground:              #2E3440;
-  --card:                    #ECEFF4;
-  --card-foreground:         #2E3440;
-  --popover:                 #E5E9F0;
-  --popover-foreground:      #2E3440;
-  --primary:                 #5E81AC; /* Frost 4 */
-  --primary-foreground:      #ECEFF4;
-  --secondary:               #E5E9F0;
-  --secondary-foreground:    #3B4252;
-  --muted:                   #E5E9F0;
-  --muted-foreground:        #4C566A;
-  --accent:                  #D8DEE9;
-  --accent-foreground:       #2E3440;
-  --destructive:             #BF616A; /* Aurora Red */
-  --destructive-foreground:  #ECEFF4;
-  --border:                  #D8DEE9;
-  --input:                   #D8DEE9;
-  --ring:                    #81A1C1; /* Frost 3 */
-  --chart-1:                 #5E81AC;
-  --chart-2:                 #88C0D0;
-  --chart-3:                 #A3BE8C;
-  --chart-4:                 #EBCB8B;
-  --chart-5:                 #BF616A;
+  --background:              #FAF9F5;
+  --foreground:              #1F1E1D;
+  --card:                    #FFFFFF;
+  --card-foreground:         #1F1E1D;
+  --popover:                 #FFFFFF;
+  --popover-foreground:      #1F1E1D;
+  --primary:                 #9333EA; /* Violet 600 — acento interactivo */
+  --primary-hover:           #7E22CE; /* Violet 700 */
+  --primary-foreground:      #FFFFFF;
+  --secondary:               #F0EEE6; /* Superficie neutra cálida */
+  --secondary-foreground:    #3D3C38;
+  --muted:                   #F0EEE6;
+  --muted-foreground:        #6B6A62;
+  --accent:                  #ECE9E0; /* Hover neutro cálido (no violeta) */
+  --accent-foreground:       #1F1E1D;
+  --destructive:             #D64541; /* Rojo cálido (error) */
+  --destructive-foreground:  #FFFFFF;
+  --border:                  #D1CABA; /* Borde neutro cálido — más visible */
+  --input:                   #C9C1B0; /* Borde de input neutro cálido — más visible */
+  --ring:                    #9333EA; /* Violet 600 — focus ring */
+  --chart-1:                 #9333EA; /* Violet 600 */
+  --chart-2:                 #2563EB; /* Blue */
+  --chart-3:                 #16A34A; /* Green (éxito) */
+  --chart-4:                 #CA8A04; /* Yellow (warning) */
+  --chart-5:                 #D64541; /* Red (error) */
   --radius: 0.625rem;
-  --sidebar:                 #E5E9F0;
-  --sidebar-foreground:      #2E3440;
-  --sidebar-primary:         #5E81AC;
-  --sidebar-primary-foreground: #ECEFF4;
-  --sidebar-accent:          #D8DEE9;
-  --sidebar-accent-foreground: #2E3440;
-  --sidebar-border:          #D8DEE9;
-  --sidebar-ring:            #81A1C1;
+  --sidebar:                 #F2F0E9; /* Panel neutro cálido */
+  --sidebar-foreground:      #1F1E1D;
+  --sidebar-primary:         #9333EA; /* Violet 600 — acento interactivo */
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent:          #ECE9E0; /* Hover neutro cálido (no violeta) */
+  --sidebar-accent-foreground: #1F1E1D;
+  --sidebar-border:          #D1CABA; /* Borde neutro cálido — más visible */
+  --sidebar-ring:            #9333EA; /* Violet 600 — focus ring */
 }
 
 .dark {
-  /* ── Nord: tokens semánticos de la app (tema oscuro) ── */
-  --nord-bg-base:        #2E3440; /* Polar Night 1 — fondo principal */
-  --nord-surface:        #3B4252; /* Polar Night 2 — superficies */
-  --nord-surface-strong: #434C5E; /* Polar Night 3 — elevados */
-  --nord-text:           #ECEFF4; /* Snow Storm 3 — texto principal */
-  --nord-text-soft:      #D8DEE9; /* Snow Storm 1 — texto secundario */
-  --nord-accent:         #88C0D0; /* Frost 2 — acento primario en oscuro */
-  --nord-frost:          #88C0D0; /* Frost 2 — highlight */
-  --nord-line:           rgba(236, 239, 244, 0.10);
-  --hero-a:              rgba(136, 192, 208, 0.10); /* Frost 2 tint */
-  --hero-b:              rgba(94, 129, 172, 0.07);  /* Frost 4 tint */
+  /* ── Claude (VSCode theme): tokens semánticos de la app (tema oscuro) ── */
+  --nord-bg-base:        #1F1D1A; /* Base oscura cálida (no negro/slate) */
+  --nord-surface:        #262320; /* Superficie cálida */
+  --nord-surface-strong: #2E2B27; /* Elevados cálidos */
+  --nord-text:           #E8E3D9; /* Blanco cálido — texto principal */
+  --nord-text-soft:      #A39E92; /* Gris cálido — texto secundario */
+  --nord-accent:         #A855F7; /* Violet 500 — acento (enlaces) */
+  --nord-frost:          #C084FC; /* Violet 400 — highlight / hover */
+  --nord-line:           rgba(232, 227, 217, 0.10); /* Divisor neutro cálido */
+  --hero-a:              rgba(232, 227, 217, 0.045); /* Brillo cálido tenue */
+  --hero-b:              rgba(232, 227, 217, 0.030); /* Brillo cálido tenue */
+
+  /* ── Tokens de marca (páginas de auth) — violeta interactivo (oscuro) ── */
+  --lagoon:              #A855F7; /* Violet 500 */
+  --lagoon-deep:         #C084FC; /* Violet 400 */
+  --palm:                #9333EA; /* Violet 600 — fin del degradado */
+  --sea-ink:             #E8E3D9; /* Blanco cálido — texto de marca */
 
   /* ── Tokens shadcn/ui (tema oscuro) ── */
-  --background:              #2E3440; /* Polar Night 1 */
-  --foreground:              #ECEFF4; /* Snow Storm 3 */
-  --card:                    #3B4252; /* Polar Night 2 */
-  --card-foreground:         #ECEFF4;
-  --popover:                 #3B4252;
-  --popover-foreground:      #ECEFF4;
-  --primary:                 #88C0D0; /* Frost 2 */
-  --primary-foreground:      #2E3440;
-  --secondary:               #434C5E; /* Polar Night 3 */
-  --secondary-foreground:    #ECEFF4;
-  --muted:                   #434C5E;
-  --muted-foreground:        #D8DEE9;
-  --accent:                  #434C5E;
-  --accent-foreground:       #88C0D0;
-  --destructive:             #BF616A; /* Aurora Red */
-  --destructive-foreground:  #ECEFF4;
-  --border:                  #4C566A; /* Polar Night 4 */
-  --input:                   #434C5E;
-  --ring:                    #81A1C1; /* Frost 3 */
-  --chart-1:                 #88C0D0;
-  --chart-2:                 #8FBCBB;
-  --chart-3:                 #A3BE8C;
-  --chart-4:                 #EBCB8B;
-  --chart-5:                 #BF616A;
-  --sidebar:                 #3B4252; /* Polar Night 2 */
-  --sidebar-foreground:      #ECEFF4;
-  --sidebar-primary:         #88C0D0;
-  --sidebar-primary-foreground: #2E3440;
-  --sidebar-accent:          #434C5E;
-  --sidebar-accent-foreground: #ECEFF4;
-  --sidebar-border:          #4C566A;
-  --sidebar-ring:            #81A1C1;
+  --background:              #1F1D1A;
+  --foreground:              #E8E3D9;
+  --card:                    #262320;
+  --card-foreground:         #E8E3D9;
+  --popover:                 #262320;
+  --popover-foreground:      #E8E3D9;
+  --primary:                 #9333EA; /* Violet 600 — acento interactivo */
+  --primary-hover:           #7E22CE; /* Violet 700 */
+  --primary-foreground:      #FFFFFF;
+  --secondary:               #2E2B27; /* Superficie neutra cálida */
+  --secondary-foreground:    #E8E3D9;
+  --muted:                   #2E2B27;
+  --muted-foreground:        #A39E92;
+  --accent:                  #2E2B27; /* Hover neutro cálido (no violeta) */
+  --accent-foreground:       #E8E3D9;
+  --destructive:             #FF7A7A; /* Rojo del theme (error) */
+  --destructive-foreground:  #1F1D1A;
+  --border:                  #36332E; /* Borde neutro cálido */
+  --input:                   #423E38; /* Borde de input neutro cálido */
+  --ring:                    #9333EA; /* Violet 600 — focus ring */
+  --chart-1:                 #A855F7; /* Violet 500 */
+  --chart-2:                 #7AB8FF; /* Blue del theme */
+  --chart-3:                 #86E89A; /* Green del theme (éxito) */
+  --chart-4:                 #FFDF61; /* Yellow del theme (warning) */
+  --chart-5:                 #FF7A7A; /* Red del theme (error) */
+  --sidebar:                 #1A1815; /* Panel cálido, algo más oscuro que la base */
+  --sidebar-foreground:      #E8E3D9;
+  --sidebar-primary:         #9333EA; /* Violet 600 — acento interactivo */
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent:          #2E2B27; /* Hover neutro cálido (no violeta) */
+  --sidebar-accent-foreground: #E8E3D9;
+  --sidebar-border:          #36332E; /* Borde neutro cálido */
+  --sidebar-ring:            #9333EA; /* Violet 600 — focus ring */
 }
 
 @theme inline {
@@ -199,9 +217,9 @@ body::before {
   z-index: -1;
   opacity: 0.22;
   background:
-    radial-gradient(circle at 18% 12%, rgba(236, 239, 244, 0.85), transparent 32%),
-    radial-gradient(circle at 80% 20%, rgba(136, 192, 208, 0.18), transparent 38%),
-    radial-gradient(circle at 44% 85%, rgba(94, 129, 172, 0.10), transparent 34%);
+    radial-gradient(circle at 18% 12%, rgba(250, 249, 245, 0.85), transparent 32%),
+    radial-gradient(circle at 80% 20%, rgba(232, 227, 217, 0.14), transparent 38%),
+    radial-gradient(circle at 44% 85%, rgba(200, 195, 185, 0.10), transparent 34%);
 }
 
 body::after {
@@ -249,8 +267,8 @@ pre code {
 .prose pre {
   border: 1px solid var(--nord-line);
   border-radius: 12px;
-  background: #2E3440;
-  color: #ECEFF4;
+  background: #262624;
+  color: #F5F4EE;
 }
 
 .page-wrap {
@@ -267,8 +285,8 @@ pre code {
   background: linear-gradient(165deg, var(--nord-surface-strong), var(--nord-surface));
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.5) inset,
-    0 22px 44px rgba(46, 52, 64, 0.08),
-    0 6px 18px rgba(46, 52, 64, 0.06);
+    0 22px 44px rgba(31, 30, 29, 0.08),
+    0 6px 18px rgba(31, 30, 29, 0.06);
   backdrop-filter: blur(4px);
 }
 
@@ -276,8 +294,8 @@ pre code {
   background: linear-gradient(165deg, var(--nord-surface-strong), var(--nord-surface));
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.5) inset,
-    0 18px 34px rgba(46, 52, 64, 0.08),
-    0 4px 14px rgba(46, 52, 64, 0.05);
+    0 18px 34px rgba(31, 30, 29, 0.08),
+    0 4px 14px rgba(31, 30, 29, 0.05);
 }
 
 .feature-card:hover {
@@ -315,7 +333,7 @@ a {
   height: 2px;
   transform: scaleX(0);
   transform-origin: left;
-  background: linear-gradient(90deg, var(--lagoon), #7ed3bf);
+  background: linear-gradient(90deg, var(--lagoon), #C084FC);
   transition: transform 170ms ease;
 }
 
@@ -345,8 +363,8 @@ a {
 }
 
 .site-footer {
-  border-top: 1px solid var(--line);
-  background: color-mix(in oklab, var(--header-bg) 84%, transparent 16%);
+  border-top: 1px solid var(--nord-line);
+  background: color-mix(in oklab, var(--nord-surface) 84%, transparent 16%);
 }
 
 @layer base {
