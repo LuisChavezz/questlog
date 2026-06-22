@@ -228,3 +228,19 @@ export const updateQuestSchema = z.object({
 })
 
 export type UpdateQuestValues = z.infer<typeof updateQuestSchema>
+
+// ─── Esquemas de eliminación ───────────────────────────────────────────────────
+
+/** Esquema para eliminar una quest individual por id. */
+export const deleteQuestSchema = z.object({
+  id: z.string().uuid(),
+})
+
+export type DeleteQuestValues = z.infer<typeof deleteQuestSchema>
+
+/** Esquema para eliminar múltiples quests por sus ids. */
+export const deleteQuestsSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1),
+})
+
+export type DeleteQuestsValues = z.infer<typeof deleteQuestsSchema>
