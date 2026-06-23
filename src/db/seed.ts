@@ -9,7 +9,7 @@
  */
 import { config } from 'dotenv'
 import { drizzle } from 'drizzle-orm/node-postgres'
-import * as schema from './schema.ts'
+import * as schema from './schema'
 import { account, session, user, verification } from './auth-schema.ts'
 
 // dotenv debe cargarse ANTES de que los módulos que leen process.env sean evaluados.
