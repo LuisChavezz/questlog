@@ -6,18 +6,11 @@ import { Sidebar } from './sidebar/sidebar'
 
 // Layout principal de la aplicación: sidebar + header + área de contenido
 export function AppLayout() {
-  const { isFixed, isExpanded, toggle, onMouseEnter, onMouseLeave } =
-    useSidebar()
+  const { isExpanded, toggle } = useSidebar()
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar
-        isFixed={isFixed}
-        isExpanded={isExpanded}
-        onToggle={toggle}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-      />
+      <Sidebar isExpanded={isExpanded} onToggle={toggle} />
 
       {/* Columna derecha: header sticky + área de contenido scrollable */}
       <div className="flex flex-1 min-w-0 flex-col">

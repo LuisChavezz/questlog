@@ -1,140 +1,130 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 
 import { NAV_ITEMS } from '#/config/nav-items'
+import { Tooltip, TooltipProvider } from '#/components/ui/tooltip'
 import { cn } from '#/lib/utils'
 
 import { SidebarNavItem } from './sidebar-nav-item'
 import { ThemeSwitch } from './theme-switch'
 
 interface SidebarProps {
-  isFixed: boolean
   isExpanded: boolean
   onToggle: () => void
-  onMouseEnter: () => void
-  onMouseLeave: () => void
 }
 
-export function Sidebar({
-  isFixed,
-  isExpanded,
-  onToggle,
-  onMouseEnter,
-  onMouseLeave,
-}: SidebarProps) {
-  // Modo overlay: visualmente expandido pero sin empujar el contenido
-  const isOverlay = isExpanded && !isFixed
-
+export function Sidebar({ isExpanded, onToggle }: SidebarProps) {
   return (
-    /*
-     * Wrapper: reserva el espacio en el flow del layout.
-     * Cuando es overlay (hover), el wrapper mantiene el ancho colapsado
-     * y el panel se extiende absolutamente por encima del contenido.
-     */
-    <div
-      className={cn(
-        'relative shrink-0 h-full',
-        'transition-[width] duration-300 ease-in-out',
-        isFixed ? 'w-64' : 'w-16',
-      )}
-    >
+    <TooltipProvider>
       {/*
-       * Panel outer: overflow-visible para que el botón de toggle
-       * pueda sobresalir del borde derecho sin ser cortado.
+       * Wrapper: reserva espacio fijo en el layout.
+       * El ancho cambia únicamente al hacer clic en el botón de toggle.
        */}
       <div
         className={cn(
-          'absolute inset-y-0 left-0',
-          'overflow-visible',
+          'relative shrink-0 h-full',
           'transition-[width] duration-300 ease-in-out',
           isExpanded ? 'w-64' : 'w-16',
-          isOverlay ? 'z-40' : 'z-10',
         )}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
       >
-        {/*
-         * Panel inner: overflow-hidden para recortar labels y elementos
-         * que no caben cuando el sidebar está colapsado.
-         */}
         <div
           className={cn(
-            'h-full flex flex-col',
-            'bg-sidebar',
-            'border-r border-sidebar-border',
-            'overflow-hidden',
-            isOverlay && 'shadow-2xl',
+            'absolute inset-y-0 left-0 z-10',
+            'transition-[width] duration-300 ease-in-out',
+            isExpanded ? 'w-64' : 'w-16',
           )}
         >
-          {/* Cabecera: marca + nombre de la app */}
-          <div className="flex h-16 shrink-0 items-center px-4">
-            <div
-              className={cn(
-                'flex h-8 w-8 shrink-0 items-center justify-center',
-                'rounded-lg bg-primary text-primary-foreground',
-                'text-[11px] font-bold tracking-tight select-none',
+          {/* Panel inner: overflow-hidden recorta labels al colapsar */}
+          <div
+            className={cn(
+              'h-full flex flex-col',
+              'bg-sidebar',
+              'border-r border-sidebar-border',
+              'overflow-hidden',
+            )}
+          >
+            {/* Cabecera */}
+            <div className="flex h-14 shrink-0 items-center gap-2 px-3">
+              {isExpanded ? (
+                // Expandido: logo + título + botón de colapso
+                <>
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                    <div
+                      className={cn(
+                        'flex h-8 w-8 shrink-0 items-center justify-center',
+                        'rounded-lg bg-primary text-primary-foreground',
+                        'text-[11px] font-bold tracking-tight select-none',
+                      )}
+                    >
+                      Q
+                    </div>
+                    <span className="overflow-hidden whitespace-nowrap text-sm font-semibold text-sidebar-foreground">
+                      Questlog
+                    </span>
+                  </div>
+
+                  <Tooltip content="Collapse" side="right">
+                    <button
+                      type="button"
+                      onClick={onToggle}
+                      aria-label="Collapse sidebar"
+                      className={cn(
+                        'flex size-8 shrink-0 items-center justify-center rounded-lg',
+                        'text-muted-foreground',
+                        'hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                        'cursor-pointer select-none transition-colors duration-200',
+                      )}
+                    >
+                      <PanelLeftClose size={18} aria-hidden="true" />
+                    </button>
+                  </Tooltip>
+                </>
+              ) : (
+                // Colapsado: solo el botón de expandir, centrado
+                <div className="flex flex-1 justify-center">
+                  <Tooltip content="Expand" side="right">
+                    <button
+                      type="button"
+                      onClick={onToggle}
+                      aria-label="Expand sidebar"
+                      className={cn(
+                        'flex size-8 shrink-0 items-center justify-center rounded-lg',
+                        'text-muted-foreground',
+                        'hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                        'cursor-pointer select-none transition-colors duration-200',
+                      )}
+                    >
+                      <PanelLeftOpen size={18} aria-hidden="true" />
+                    </button>
+                  </Tooltip>
+                </div>
               )}
-            >
-              Q
             </div>
 
-            {/* Nombre y subtítulo: se desvanecen al colapsar */}
-            <div
-              className={cn(
-                'ml-3 overflow-hidden',
-                'transition-[max-width,opacity] duration-300 ease-in-out',
-                isExpanded ? 'max-w-40 opacity-100' : 'max-w-0 opacity-0',
-              )}
-            >
-              <span className="block text-sm font-semibold text-foreground whitespace-nowrap">
-                Questlog
-              </span>
-              <span className="block text-[11px] leading-tight text-muted-foreground whitespace-nowrap">
-                Task Manager
-              </span>
-            </div>
+            {/* Separador */}
+            <div className="mx-3 h-px shrink-0 bg-sidebar-border" />
+
+            {/* Navegación */}
+            <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3">
+              <ul className="space-y-1">
+                {NAV_ITEMS.map((item) => (
+                  <SidebarNavItem
+                    key={item.to}
+                    item={item}
+                    isExpanded={isExpanded}
+                  />
+                ))}
+              </ul>
+            </nav>
+
+            {/* Pie: separador + selector de tema */}
+            <div className="mx-3 h-px shrink-0 bg-sidebar-border" />
+
+            <ThemeSwitch isExpanded={isExpanded} />
           </div>
-
-          {/* Separador */}
-          <div className="mx-3 h-px shrink-0 bg-sidebar-border" />
-
-          {/* Navegación */}
-          <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2">
-            <ul className="space-y-0.5">
-              {NAV_ITEMS.map((item) => (
-                <SidebarNavItem key={item.to} item={item} isExpanded={isExpanded} />
-              ))}
-            </ul>
-          </nav>
-
-          {/* Separador inferior */}
-          <div className="mx-3 h-px shrink-0 bg-sidebar-border" />
-
-          {/* Selector de tema premium con switch sol/luna */}
-          <ThemeSwitch isExpanded={isExpanded} />
         </div>
-
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-label={isFixed ? 'Contraer sidebar' : 'Expandir sidebar'}
-          className={cn(
-            'absolute top-5.5 right-0 translate-x-1/2 z-50',
-            'flex h-6 w-6 items-center justify-center rounded-full',
-            'bg-primary text-primary-foreground',
-            'shadow-md ring-2 ring-sidebar',
-            'hover:brightness-110 active:scale-90',
-            'transition-transform duration-150',
-            'cursor-pointer select-none',
-          )}
-        >
-          {isFixed ? (
-            <ChevronLeft size={12} strokeWidth={2.5} />
-          ) : (
-            <ChevronRight size={12} strokeWidth={2.5} />
-          )}
-        </button>
       </div>
-    </div>
+    </TooltipProvider>
   )
 }
-

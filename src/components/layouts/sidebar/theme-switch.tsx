@@ -1,26 +1,48 @@
 import { Moon, Sun } from 'lucide-react'
 
 import { useTheme } from '#/components/providers/theme-provider'
+import { Tooltip } from '#/components/ui/tooltip'
 import { cn } from '#/lib/utils'
 
 interface ThemeSwitchProps {
   isExpanded: boolean
 }
 
-// - Modo colapsado: muestra el icono activo (decorativo, no interactivo).
-// - Modo expandido: muestra la píldora con thumb deslizante y etiqueta.
-
 export function ThemeSwitch({ isExpanded }: ThemeSwitchProps) {
   const { theme, toggleTheme } = useTheme()
   const isDark = theme === 'dark'
+  const label = isDark ? 'Dark mode' : 'Light mode'
+
+  if (!isExpanded) {
+    return (
+      <div className="shrink-0 px-2 pt-3">
+        <Tooltip content={label} side="right">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={`Toggle theme — ${label}`}
+            className={cn(
+              'flex w-full justify-center items-center rounded-lg py-2',
+              'text-sidebar-foreground/65',
+              'hover:bg-sidebar-accent hover:text-sidebar-foreground',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+              'transition-colors duration-150 cursor-pointer',
+            )}
+          >
+            {isDark ? <Moon size={18} /> : <Sun size={18} />}
+          </button>
+        </Tooltip>
+      </div>
+    )
+  }
 
   return (
-    <div className="shrink-0 px-2 py-3">
+    <div className="shrink-0 px-2 pt-3">
       <div
         className={cn(
-          'flex items-center gap-3 rounded-lg px-3 py-2.5',
+          'flex items-center gap-3 rounded-lg py-2 px-2.5',
           'text-sm font-medium',
-          'text-sidebar-foreground/60',
+          'text-sidebar-foreground/65',
           'overflow-hidden',
         )}
       >
@@ -32,26 +54,19 @@ export function ThemeSwitch({ isExpanded }: ThemeSwitchProps) {
           {isDark ? <Moon size={18} /> : <Sun size={18} />}
         </span>
 
-        {/* Contenido visible solo en modo expandido: etiqueta + switch premium */}
-        <div
-          className={cn(
-            'flex flex-1 items-center justify-between overflow-hidden',
-            'transition-[max-width,opacity] duration-200 ease-in-out',
-            isExpanded ? 'max-w-40 opacity-100' : 'max-w-0 opacity-0',
-          )}
-        >
+        {/* Etiqueta + switch premium */}
+        <div className="flex flex-1 items-center justify-between overflow-hidden">
           <span className="whitespace-nowrap text-sm">
-            {isDark ? 'Modo oscuro' : 'Modo claro'}
+            {isDark ? 'Dark mode' : 'Light mode'}
           </span>
-          
+
           {/* Switch de tema */}
           <button
             type="button"
             role="switch"
             aria-checked={isDark}
-            aria-label="Alternar tema claro/oscuro"
+            aria-label="Toggle light/dark theme"
             onClick={toggleTheme}
-            tabIndex={isExpanded ? 0 : -1}
             className={cn(
               'relative shrink-0 flex items-center rounded-full',
               'w-14 h-7',
