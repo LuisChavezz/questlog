@@ -1,6 +1,11 @@
+import { useGuilds } from '../hooks/use-guilds'
 import { GuildsEmptyState } from './guilds-empty-state'
+import { GuildsGrid } from './guilds-grid'
 
 export function GuildsPage() {
+  // Datos pre-cargados en SSR por el loader de la ruta; sin parpadeo de carga.
+  const { data: guilds = [] } = useGuilds()
+
   return (
     <div className="flex flex-col gap-6 p-8">
       <header>
@@ -9,7 +14,12 @@ export function GuildsPage() {
           Collaborate with others by joining or creating a guild.
         </p>
       </header>
-      <GuildsEmptyState />
+
+      {guilds.length === 0 ? (
+        <GuildsEmptyState />
+      ) : (
+        <GuildsGrid guilds={guilds} />
+      )}
     </div>
   )
 }
