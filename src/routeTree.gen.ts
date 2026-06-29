@@ -18,6 +18,11 @@ import { Route as AppQuestsRouteImport } from './routes/_app/quests'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppGuildsIndexRouteImport } from './routes/_app/guilds/index'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as AppGuildsSlugRouteImport } from './routes/_app/guilds/$slug'
+import { Route as AppGuildsSlugIndexRouteImport } from './routes/_app/guilds/$slug/index'
+import { Route as AppGuildsSlugSettingsRouteImport } from './routes/_app/guilds/$slug/settings'
+import { Route as AppGuildsSlugQuestsRouteImport } from './routes/_app/guilds/$slug/quests'
+import { Route as AppGuildsSlugMembersRouteImport } from './routes/_app/guilds/$slug/members'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/_auth',
@@ -62,6 +67,31 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppGuildsSlugRoute = AppGuildsSlugRouteImport.update({
+  id: '/guilds/$slug',
+  path: '/guilds/$slug',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppGuildsSlugIndexRoute = AppGuildsSlugIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppGuildsSlugRoute,
+} as any)
+const AppGuildsSlugSettingsRoute = AppGuildsSlugSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppGuildsSlugRoute,
+} as any)
+const AppGuildsSlugQuestsRoute = AppGuildsSlugQuestsRouteImport.update({
+  id: '/quests',
+  path: '/quests',
+  getParentRoute: () => AppGuildsSlugRoute,
+} as any)
+const AppGuildsSlugMembersRoute = AppGuildsSlugMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => AppGuildsSlugRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -69,8 +99,13 @@ export interface FileRoutesByFullPath {
   '/quests': typeof AppQuestsRoute
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
+  '/guilds/$slug': typeof AppGuildsSlugRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/guilds/': typeof AppGuildsIndexRoute
+  '/guilds/$slug/members': typeof AppGuildsSlugMembersRoute
+  '/guilds/$slug/quests': typeof AppGuildsSlugQuestsRoute
+  '/guilds/$slug/settings': typeof AppGuildsSlugSettingsRoute
+  '/guilds/$slug/': typeof AppGuildsSlugIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -80,6 +115,10 @@ export interface FileRoutesByTo {
   '/register': typeof AuthRegisterRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/guilds': typeof AppGuildsIndexRoute
+  '/guilds/$slug/members': typeof AppGuildsSlugMembersRoute
+  '/guilds/$slug/quests': typeof AppGuildsSlugQuestsRoute
+  '/guilds/$slug/settings': typeof AppGuildsSlugSettingsRoute
+  '/guilds/$slug': typeof AppGuildsSlugIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -90,8 +129,13 @@ export interface FileRoutesById {
   '/_app/quests': typeof AppQuestsRoute
   '/_auth/login': typeof AuthLoginRoute
   '/_auth/register': typeof AuthRegisterRoute
+  '/_app/guilds/$slug': typeof AppGuildsSlugRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_app/guilds/': typeof AppGuildsIndexRoute
+  '/_app/guilds/$slug/members': typeof AppGuildsSlugMembersRoute
+  '/_app/guilds/$slug/quests': typeof AppGuildsSlugQuestsRoute
+  '/_app/guilds/$slug/settings': typeof AppGuildsSlugSettingsRoute
+  '/_app/guilds/$slug/': typeof AppGuildsSlugIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -101,8 +145,13 @@ export interface FileRouteTypes {
     | '/quests'
     | '/login'
     | '/register'
+    | '/guilds/$slug'
     | '/api/auth/$'
     | '/guilds/'
+    | '/guilds/$slug/members'
+    | '/guilds/$slug/quests'
+    | '/guilds/$slug/settings'
+    | '/guilds/$slug/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -112,6 +161,10 @@ export interface FileRouteTypes {
     | '/register'
     | '/api/auth/$'
     | '/guilds'
+    | '/guilds/$slug/members'
+    | '/guilds/$slug/quests'
+    | '/guilds/$slug/settings'
+    | '/guilds/$slug'
   id:
     | '__root__'
     | '/'
@@ -121,8 +174,13 @@ export interface FileRouteTypes {
     | '/_app/quests'
     | '/_auth/login'
     | '/_auth/register'
+    | '/_app/guilds/$slug'
     | '/api/auth/$'
     | '/_app/guilds/'
+    | '/_app/guilds/$slug/members'
+    | '/_app/guilds/$slug/quests'
+    | '/_app/guilds/$slug/settings'
+    | '/_app/guilds/$slug/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -197,18 +255,73 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/guilds/$slug': {
+      id: '/_app/guilds/$slug'
+      path: '/guilds/$slug'
+      fullPath: '/guilds/$slug'
+      preLoaderRoute: typeof AppGuildsSlugRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/guilds/$slug/': {
+      id: '/_app/guilds/$slug/'
+      path: '/'
+      fullPath: '/guilds/$slug/'
+      preLoaderRoute: typeof AppGuildsSlugIndexRouteImport
+      parentRoute: typeof AppGuildsSlugRoute
+    }
+    '/_app/guilds/$slug/settings': {
+      id: '/_app/guilds/$slug/settings'
+      path: '/settings'
+      fullPath: '/guilds/$slug/settings'
+      preLoaderRoute: typeof AppGuildsSlugSettingsRouteImport
+      parentRoute: typeof AppGuildsSlugRoute
+    }
+    '/_app/guilds/$slug/quests': {
+      id: '/_app/guilds/$slug/quests'
+      path: '/quests'
+      fullPath: '/guilds/$slug/quests'
+      preLoaderRoute: typeof AppGuildsSlugQuestsRouteImport
+      parentRoute: typeof AppGuildsSlugRoute
+    }
+    '/_app/guilds/$slug/members': {
+      id: '/_app/guilds/$slug/members'
+      path: '/members'
+      fullPath: '/guilds/$slug/members'
+      preLoaderRoute: typeof AppGuildsSlugMembersRouteImport
+      parentRoute: typeof AppGuildsSlugRoute
+    }
   }
 }
+
+interface AppGuildsSlugRouteChildren {
+  AppGuildsSlugMembersRoute: typeof AppGuildsSlugMembersRoute
+  AppGuildsSlugQuestsRoute: typeof AppGuildsSlugQuestsRoute
+  AppGuildsSlugSettingsRoute: typeof AppGuildsSlugSettingsRoute
+  AppGuildsSlugIndexRoute: typeof AppGuildsSlugIndexRoute
+}
+
+const AppGuildsSlugRouteChildren: AppGuildsSlugRouteChildren = {
+  AppGuildsSlugMembersRoute: AppGuildsSlugMembersRoute,
+  AppGuildsSlugQuestsRoute: AppGuildsSlugQuestsRoute,
+  AppGuildsSlugSettingsRoute: AppGuildsSlugSettingsRoute,
+  AppGuildsSlugIndexRoute: AppGuildsSlugIndexRoute,
+}
+
+const AppGuildsSlugRouteWithChildren = AppGuildsSlugRoute._addFileChildren(
+  AppGuildsSlugRouteChildren,
+)
 
 interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
   AppQuestsRoute: typeof AppQuestsRoute
+  AppGuildsSlugRoute: typeof AppGuildsSlugRouteWithChildren
   AppGuildsIndexRoute: typeof AppGuildsIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
   AppQuestsRoute: AppQuestsRoute,
+  AppGuildsSlugRoute: AppGuildsSlugRouteWithChildren,
   AppGuildsIndexRoute: AppGuildsIndexRoute,
 }
 
