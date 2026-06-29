@@ -1,8 +1,4 @@
-import { useState } from 'react'
-
 import { Button } from '#/components/ui/button'
-
-import { CreateGuildDialog } from './create-guild-dialog'
 
 // Ilustración SVG con temática de gremio RPG (escudo con espadas cruzadas)
 function GuildEmblem() {
@@ -82,9 +78,12 @@ function GuildEmblem() {
   )
 }
 
-export function GuildsEmptyState() {
-  const [dialogOpen, setDialogOpen] = useState(false)
+type GuildsEmptyStateProps = {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
 
+export function GuildsEmptyState({ open, onOpenChange }: GuildsEmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center gap-6 py-24 text-center">
       <div className="rounded-2xl bg-primary/5 p-6">
@@ -96,9 +95,7 @@ export function GuildsEmptyState() {
           Create a guild to start collaborating with your team on quests.
         </p>
       </div>
-      <Button onClick={() => setDialogOpen(true)}>Create Guild</Button>
-
-      <CreateGuildDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <Button onClick={() => onOpenChange(true)}>Create Guild</Button>
     </div>
   )
 }
