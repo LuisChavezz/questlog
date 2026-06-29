@@ -1,8 +1,9 @@
 // Esquema de quests — tabla principal de la aplicación
-import { sql } from 'drizzle-orm'
+import { relations, sql } from 'drizzle-orm'
 import { pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 
 import { user } from '../auth-schema'
+import { guilds } from './guilds'
 
 // Enum: estado de la quest
 export const questStatusEnum = pgEnum('quest_status', [
@@ -24,9 +25,22 @@ export const questPriorityEnum = pgEnum('quest_priority', [
 // Tabla de quests
 export const quests = pgTable('quests', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: text('user_id')
+  // Creador de la quest (obligatorio)
+  ownerId: text('owner_id')
     .notNull()
     .references(() => user.id, { onDelete: 'cascade' }),
+  // Usuario al que se asigna la quest (opcional)
+  assigneeId: text('assignee_id').references(() => user.id, {
+    onDelete: 'set null',
+  }),
+  // Usuario que supervisa la quest (opcional)
+  supervisorId: text('supervisor_id').references(() => user.id, {
+    onDelete: 'set null',
+  }),
+  // Guild al que pertenece la quest; NULL = quest personal
+  guildId: text('guild_id').references(() => guilds.id, {
+    onDelete: 'set null',
+  }),
   title: text('title').notNull(),
   description: text('description'),
   status: questStatusEnum('status').notNull().default('backlog'),
@@ -45,6 +59,29 @@ export const quests = pgTable('quests', {
     .defaultNow()
     .$onUpdate(() => new Date()),
 })
+
+// Relaciones de quests: dueño, asignado y supervisor (→ user); gremio (→ guilds)
+export const questsRelations = relations(quests, ({ one }) => ({
+  owner: one(user, {
+    fields: [quests.ownerId],
+    references: [user.id],
+    relationName: 'questOwner',
+  }),
+  assignee: one(user, {
+    fields: [quests.assigneeId],
+    references: [user.id],
+    relationName: 'questAssignee',
+  }),
+  supervisor: one(user, {
+    fields: [quests.supervisorId],
+    references: [user.id],
+    relationName: 'questSupervisor',
+  }),
+  guild: one(guilds, {
+    fields: [quests.guildId],
+    references: [guilds.id],
+  }),
+}))
 
 // Tipos inferidos para uso en la aplicación
 export type Quest = typeof quests.$inferSelect

@@ -51,14 +51,14 @@ export const updateQuest = createServerFn({ method: 'POST' })
       throw new Error('No fields to update')
     }
 
-    // La cláusula WHERE incluye userId para evitar actualizaciones cruzadas
+    // La cláusula WHERE incluye ownerId para evitar actualizaciones cruzadas
     const [quest] = await db
       .update(quests)
       .set(updatePayload)
       .where(
         and(
           eq(quests.id, data.id),
-          eq(quests.userId, session.user.id),
+          eq(quests.ownerId, session.user.id),
         ),
       )
       .returning()

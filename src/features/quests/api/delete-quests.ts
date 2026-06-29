@@ -19,14 +19,14 @@ export const deleteQuests = createServerFn({ method: 'POST' })
       throw new Error('Unauthorized: must be signed in to delete quests')
     }
 
-    // La cláusula WHERE combina inArray con userId para eliminar solo las quests
+    // La cláusula WHERE combina inArray con ownerId para eliminar solo las quests
     // seleccionadas que pertenecen al usuario y evitar eliminaciones cruzadas
     const deleted = await db
       .delete(quests)
       .where(
         and(
           inArray(quests.id, data.ids),
-          eq(quests.userId, session.user.id),
+          eq(quests.ownerId, session.user.id),
         ),
       )
       .returning()

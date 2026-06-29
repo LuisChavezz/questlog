@@ -18,7 +18,7 @@ export const getQuests = createServerFn({ method: 'GET' }).handler(async () => {
   const result = await db
     .select()
     .from(quests)
-    .where(eq(quests.userId, session.user.id))
+    .where(eq(quests.ownerId, session.user.id))
     .orderBy(asc(quests.createdAt))
 
   return result

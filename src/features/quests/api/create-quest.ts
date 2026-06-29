@@ -35,7 +35,7 @@ export const createQuest = createServerFn({ method: 'POST' })
     const [quest] = await db
       .insert(quests)
       .values({
-        userId: session.user.id,
+        ownerId: session.user.id,
         title: data.title,
         description: data.description ?? null,
         status: 'backlog',
