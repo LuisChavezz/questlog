@@ -4,6 +4,7 @@
  * y permite edición inline campo a campo.
  */
 import { useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Activity, Flag, Trash2 } from 'lucide-react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 
@@ -30,10 +31,14 @@ interface PendingDeletion {
   clearSelection: () => void
 }
 
-export function QuestsTable() {
-  // useSuspenseQuery garantiza que los datos estén disponibles antes de renderizar.
-  // El Suspense boundary en QuestsPage muestra el skeleton mientras carga.
-  const { data: quests } = useSuspenseQuery(questsQueryOptions)
+interface QuestsTableContentProps {
+  quests: Quest[]
+  actions?: ReactNode
+}
+
+// Componente presentacional reutilizable — acepta quests como prop para que
+// distintas rutas (personal, guild) puedan alimentarlo con su propia query.
+export function QuestsTableContent({ quests, actions }: QuestsTableContentProps) {
   const { mutate: updateQuest } = useUpdateQuest()
   const { mutateAsync: bulkUpdateQuests, isPending: isBulkUpdating } =
     useBulkUpdateQuests()
@@ -137,7 +142,7 @@ export function QuestsTable() {
         getRowId={(quest) => quest.id}
         filterPlaceholder="Search quests..."
         defaultPageSize={10}
-        actions={<CreateQuestDialog />}
+        actions={actions}
       />
 
       <ConfirmDialog
@@ -158,4 +163,11 @@ export function QuestsTable() {
       />
     </>
   )
+}
+
+export function QuestsTable() {
+  // useSuspenseQuery garantiza que los datos estén disponibles antes de renderizar.
+  // El Suspense boundary en QuestsPage muestra el skeleton mientras carga.
+  const { data: quests } = useSuspenseQuery(questsQueryOptions)
+  return <QuestsTableContent quests={quests} actions={<CreateQuestDialog />} />
 }
