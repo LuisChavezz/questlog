@@ -1,14 +1,8 @@
+import { useQuery } from '@tanstack/react-query'
 import { Shield } from 'lucide-react'
 
 import { Badge } from '#/components/ui/badge'
-
-// Datos mockeados temporales — el slug se usará como clave de query cuando
-// se implemente el fetching real del detalle del guild
-const MOCK_GUILD = {
-  name: 'The Fellowship',
-  description: 'A guild for adventurers seeking epic quests.',
-  role: 'owner' as const,
-}
+import { guildQueryOptions } from '../api/guild-query-options'
 
 const ROLE_BADGE_VARIANT = {
   owner: 'default',
@@ -22,8 +16,8 @@ const ROLE_LABEL = {
   member: 'Member',
 } as const
 
-export function GuildDetailHeader({ slug: _slug }: { slug: string }) {
-  const { name, description, role } = MOCK_GUILD
+export function GuildDetailHeader({ slug }: { slug: string }) {
+  const { data } = useQuery(guildQueryOptions(slug))
 
   return (
     <header className="bg-background px-8 pt-6">
@@ -34,14 +28,21 @@ export function GuildDetailHeader({ slug: _slug }: { slug: string }) {
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <div className="flex items-center gap-3">
             <h1 className="truncate text-2xl font-semibold text-foreground">
-              {name}
+              {data?.guild.name ?? '—'}
             </h1>
-            <Badge variant={ROLE_BADGE_VARIANT[role]} className="shrink-0">
-              {ROLE_LABEL[role]}
-            </Badge>
+            {data?.currentUserRole && (
+              <Badge
+                variant={ROLE_BADGE_VARIANT[data.currentUserRole]}
+                className="shrink-0"
+              >
+                {ROLE_LABEL[data.currentUserRole]}
+              </Badge>
+            )}
           </div>
-          {description && (
-            <p className="text-sm text-muted-foreground">{description}</p>
+          {data?.guild.description && (
+            <p className="text-sm text-muted-foreground">
+              {data.guild.description}
+            </p>
           )}
         </div>
       </div>

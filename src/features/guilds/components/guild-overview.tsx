@@ -1,3 +1,5 @@
+import { useParams } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { CheckCircle2, Clock, Pencil, Plus } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -8,61 +10,78 @@ import {
   AvatarGroupCount,
 } from '#/components/ui/avatar'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
+import { guildQueryOptions } from '../api/guild-query-options'
+import type { GuildDetail } from '../api/get-guild'
 
-// Estadísticas mockeadas del guild
-const MOCK_STATS = [
-  { label: 'Active Quests', value: 12 },
-  { label: 'In Progress', value: 5 },
-  { label: 'Completed this week', value: 8 },
-] as const
+type QuestStatus = GuildDetail['recentActivity'][number]['status']
 
-// Miembros mockeados — solo los primeros se muestran en la preview de avatares
-const MOCK_MEMBERS = [
-  { id: '1', initials: 'LC', name: 'Luis Chavez' },
-  { id: '2', initials: 'JD', name: 'Jane Doe' },
-  { id: '3', initials: 'AB', name: 'Alice Brown' },
-  { id: '4', initials: 'MK', name: 'Max Kim' },
-  { id: '5', initials: 'SP', name: 'Sara Park' },
-] as const
-
-const TOTAL_MEMBERS = 24
-
-type ActivityAction = 'completed' | 'started' | 'created' | 'updated'
-
-const ACTIVITY_ICONS: Record<ActivityAction, LucideIcon> = {
-  completed: CheckCircle2,
-  started: Clock,
-  created: Plus,
-  updated: Pencil,
+const STATUS_ICON: Record<QuestStatus, LucideIcon> = {
+  done: CheckCircle2,
+  in_progress: Clock,
+  backlog: Plus,
+  todo: Plus,
+  cancelled: Pencil,
 }
 
-const ACTIVITY_LABELS: Record<ActivityAction, string> = {
-  completed: 'Completed',
-  started: 'Started',
-  created: 'Created',
-  updated: 'Updated',
+const STATUS_LABEL: Record<QuestStatus, string> = {
+  done: 'Completed',
+  in_progress: 'In Progress',
+  backlog: 'Added',
+  todo: 'Added',
+  cancelled: 'Cancelled',
 }
 
-// Actividad reciente mockeada
-const MOCK_ACTIVITY: Array<{
-  id: string
-  quest: string
-  action: ActivityAction
-  time: string
-}> = [
-  { id: '1', quest: "Dragon's Lair", action: 'completed', time: '2 hours ago' },
-  { id: '2', quest: 'Goblin Hunt', action: 'started', time: '5 hours ago' },
-  { id: '3', quest: 'Crystal Mines', action: 'created', time: '1 day ago' },
-  { id: '4', quest: 'Dark Forest Expedition', action: 'updated', time: '2 days ago' },
-  { id: '5', quest: 'Ancient Ruins', action: 'completed', time: '3 days ago' },
-]
+// Tiempo relativo legible sin librería externa
+function getRelativeTime(date: Date | string): string {
+  const diff = Date.now() - new Date(date).getTime()
+  const minutes = Math.floor(diff / 60_000)
+  if (minutes < 60) return minutes <= 1 ? 'just now' : `${minutes} minutes ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`
+  const days = Math.floor(hours / 24)
+  if (days === 1) return 'yesterday'
+  if (days < 7) return `${days} days ago`
+  const weeks = Math.floor(days / 7)
+  return weeks === 1 ? '1 week ago' : `${weeks} weeks ago`
+}
+
+// Número máximo de avatares visibles antes del contador "+N"
+const MAX_VISIBLE_MEMBERS = 5
 
 export function GuildOverview() {
+  const { slug } = useParams({ from: '/_app/guilds/$slug/' })
+  const { data, isError } = useQuery(guildQueryOptions(slug))
+
+  if (isError) {
+    return (
+      <div className="flex flex-col gap-6 p-8">
+        <p className="text-sm text-muted-foreground">
+          Failed to load guild overview.
+        </p>
+      </div>
+    )
+  }
+
+  const stats = [
+    { label: 'Active Quests', value: data?.stats.activeCount ?? '—' },
+    { label: 'In Progress', value: data?.stats.inProgressCount ?? '—' },
+    {
+      label: 'Completed this week',
+      value: data?.stats.completedThisWeekCount ?? '—',
+    },
+  ]
+
+  const members = data?.members ?? []
+  const visibleMembers = members.slice(0, MAX_VISIBLE_MEMBERS)
+  const extraCount = Math.max(0, members.length - MAX_VISIBLE_MEMBERS)
+
+  const recentActivity = data?.recentActivity ?? []
+
   return (
     <div className="flex flex-col gap-6 p-8">
       {/* Fila de estadísticas */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {MOCK_STATS.map((stat) => (
+        {stats.map((stat) => (
           <Card key={stat.label} className="gap-2 py-5">
             <CardHeader>
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -84,21 +103,25 @@ export function GuildOverview() {
             <CardTitle>Members</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-4">
-              <AvatarGroup>
-                {MOCK_MEMBERS.map((member) => (
-                  <Avatar key={member.id} title={member.name}>
-                    <AvatarFallback>{member.initials}</AvatarFallback>
-                  </Avatar>
-                ))}
-                <AvatarGroupCount>
-                  +{TOTAL_MEMBERS - MOCK_MEMBERS.length}
-                </AvatarGroupCount>
-              </AvatarGroup>
-              <p className="text-sm text-muted-foreground">
-                {TOTAL_MEMBERS} members
-              </p>
-            </div>
+            {members.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No members yet.</p>
+            ) : (
+              <div className="flex items-center gap-4">
+                <AvatarGroup>
+                  {visibleMembers.map((member) => (
+                    <Avatar key={member.id} title={member.name}>
+                      <AvatarFallback>{member.initials}</AvatarFallback>
+                    </Avatar>
+                  ))}
+                  {extraCount > 0 && (
+                    <AvatarGroupCount>+{extraCount}</AvatarGroupCount>
+                  )}
+                </AvatarGroup>
+                <p className="text-sm text-muted-foreground">
+                  {members.length} member{members.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -108,24 +131,28 @@ export function GuildOverview() {
             <CardTitle>Recent Activity</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            {MOCK_ACTIVITY.map((item) => {
-              const Icon = ACTIVITY_ICONS[item.action]
-              return (
-                <div key={item.id} className="flex items-center gap-3">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                    <Icon size={13} aria-hidden="true" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground">
-                      {item.quest}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {ACTIVITY_LABELS[item.action]} · {item.time}
-                    </p>
+            {recentActivity.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No recent activity.</p>
+            ) : (
+              recentActivity.map((item) => {
+                const Icon = STATUS_ICON[item.status]
+                return (
+                  <div key={item.id} className="flex items-center gap-3">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                      <Icon size={13} aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {item.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {STATUS_LABEL[item.status]} · {getRelativeTime(item.updatedAt)}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })
+            )}
           </CardContent>
         </Card>
       </div>

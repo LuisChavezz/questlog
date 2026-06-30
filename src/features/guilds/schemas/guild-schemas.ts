@@ -61,3 +61,10 @@ export const createGuildSchema = z.object({
 })
 
 export type CreateGuildValues = z.infer<typeof createGuildSchema>
+
+// ─── Esquema de consulta por slug ─────────────────────────────────────────────
+
+/** Esquema de entrada para obtener el detalle de un guild por slug */
+export const getGuildInputSchema = z.object({
+  slug: guildSlugSchema,
+})

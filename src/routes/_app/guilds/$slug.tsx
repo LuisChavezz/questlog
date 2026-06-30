@@ -1,8 +1,12 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router'
 
+import { guildQueryOptions } from '#/features/guilds/api/guild-query-options'
 import { GuildDetailHeader } from '#/features/guilds/components/guild-detail-header'
 
 export const Route = createFileRoute('/_app/guilds/$slug')({
+  // Pre-carga el detalle del guild en el servidor antes de enviar el HTML al cliente
+  loader: ({ params, context: { queryClient } }) =>
+    queryClient.ensureQueryData(guildQueryOptions(params.slug)),
   component: GuildDetailPage,
 })
 
