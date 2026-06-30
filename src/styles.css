@@ -238,15 +238,24 @@ body::after {
   mask-image: radial-gradient(circle at 50% 30%, black, transparent 78%);
 }
 
-a {
-  color: var(--nord-accent);
-  text-decoration-color: color-mix(in srgb, var(--nord-accent) 40%, transparent);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
-}
+/*
+ * Estilos de <a> en @layer base para que las utilidades de Tailwind puedan
+ * sobreescribirlos. Si quedan fuera de un @layer (sin capas) tienen mayor
+ * precedencia que todas las utilidades del @layer utilities, lo que hace que
+ * text-muted-foreground, text-primary y similares no tengan efecto sobre
+ * elementos Link/anchor dentro del sidebar y otros componentes.
+ */
+@layer base {
+  a {
+    color: var(--nord-accent);
+    text-decoration-color: color-mix(in srgb, var(--nord-accent) 40%, transparent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+  }
 
-a:hover {
-  color: var(--nord-frost);
+  a:hover {
+    color: var(--nord-frost);
+  }
 }
 
 code {

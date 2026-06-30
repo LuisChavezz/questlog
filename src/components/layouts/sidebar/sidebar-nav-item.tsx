@@ -19,19 +19,15 @@ export function SidebarNavItem({ item, isExpanded }: SidebarNavItemProps) {
       to={to}
       className={cn(
         'flex w-full items-center rounded-lg py-2',
+        isExpanded ? 'gap-3 px-2.5' : 'justify-center px-0',
         'text-sm font-medium',
         'outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
         'transition-colors duration-150',
-        isExpanded ? 'gap-3 px-2.5' : 'justify-center px-0',
       )}
-      activeProps={{
-        className: 'bg-primary/10 text-primary dark:bg-primary/15',
-      }}
+      activeProps={{ className: 'bg-primary/10 text-primary' }}
       inactiveProps={{
-        className: cn(
-          'text-sidebar-foreground/65',
-          'hover:bg-sidebar-accent hover:text-sidebar-foreground',
-        ),
+        className:
+          'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
       }}
     >
       <Icon size={18} className="shrink-0" aria-hidden="true" />

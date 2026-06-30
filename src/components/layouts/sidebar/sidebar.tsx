@@ -1,10 +1,8 @@
-import { Fragment } from 'react'
-
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 
 import { NAV_ITEMS } from '#/config/nav-items'
 import { Tooltip, TooltipProvider } from '#/components/ui/tooltip'
-import { GuildSubNav } from '#/features/guilds/components/guild-sub-nav'
+import { GuildNavItem } from '#/features/guilds/components/guild-sub-nav'
 import { cn } from '#/lib/utils'
 
 import { SidebarNavItem } from './sidebar-nav-item'
@@ -111,15 +109,13 @@ export function Sidebar({ isExpanded, onToggle }: SidebarProps) {
             {/* Navegación */}
             <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3">
               <ul className="space-y-1">
-                {NAV_ITEMS.map((item) => (
-                  <Fragment key={item.to}>
-                    <SidebarNavItem item={item} isExpanded={isExpanded} />
-                    {/* Sub-navegación de guild: solo se renderiza cuando el slug está activo */}
-                    {item.to === '/guilds' && (
-                      <GuildSubNav isExpanded={isExpanded} />
-                    )}
-                  </Fragment>
-                ))}
+                {NAV_ITEMS.map((item) =>
+                  item.to === '/guilds' ? (
+                    <GuildNavItem key={item.to} isExpanded={isExpanded} />
+                  ) : (
+                    <SidebarNavItem key={item.to} item={item} isExpanded={isExpanded} />
+                  ),
+                )}
               </ul>
             </nav>
 

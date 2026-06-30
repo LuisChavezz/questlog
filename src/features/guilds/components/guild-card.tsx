@@ -2,6 +2,8 @@
  * GuildCard — tarjeta clicable que resume un guild del usuario.
  * Muestra nombre, slug, descripción (recortada) y un badge con el rol.
  */
+import { Link } from '@tanstack/react-router'
+
 import { Badge } from '#/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
 import type { GuildWithRole } from '../api/get-guilds'
@@ -26,10 +28,9 @@ type GuildCardProps = {
 
 export function GuildCard({ guild }: GuildCardProps) {
   return (
-    // Ancla nativa: la ruta de detalle /guilds/[slug] aún no existe en el árbol
-    // de rutas, por lo que se usa href en lugar de un Link tipado.
-    <a
-      href={`/guilds/${guild.slug}`}
+    <Link
+      to="/guilds/$slug"
+      params={{ slug: guild.slug }}
       className="group rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <Card className="h-full gap-4 py-5 transition-colors group-hover:border-primary/40 group-hover:shadow-md">
@@ -57,6 +58,6 @@ export function GuildCard({ guild }: GuildCardProps) {
           </CardContent>
         )}
       </Card>
-    </a>
+    </Link>
   )
 }
