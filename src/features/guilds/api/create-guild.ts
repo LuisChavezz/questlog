@@ -1,11 +1,47 @@
 // Acción de servidor — crea un guild y registra a su dueño como miembro
+import { randomBytes } from 'node:crypto'
+
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
+import { eq } from 'drizzle-orm'
 
 import { db } from '#/db'
 import { guildMembers, guilds } from '#/db/schema'
 import { auth } from '#/lib/auth'
 import { createGuildSchema } from '../schemas/guild-schemas'
+
+// Alfabeto sin caracteres ambiguos (excluye 0/O, 1/I/l)
+const INVITE_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz'
+const INVITE_CODE_LENGTH = 8
+
+// Genera una cadena aleatoria del largo indicado usando el alfabeto definido
+function generateBaseCode(): string {
+  const bytes = randomBytes(INVITE_CODE_LENGTH * 2)
+  let code = ''
+  for (let i = 0; i < bytes.length && code.length < INVITE_CODE_LENGTH; i++) {
+    // Rejection sampling para distribución uniforme sin sesgo
+    const limit = Math.floor(256 / INVITE_CODE_ALPHABET.length) * INVITE_CODE_ALPHABET.length
+    if (bytes[i] < limit) {
+      code += INVITE_CODE_ALPHABET[bytes[i] % INVITE_CODE_ALPHABET.length]
+    }
+  }
+  // Si los bytes generados no fueron suficientes, reintentar (raro pero posible)
+  return code.length === INVITE_CODE_LENGTH ? code : generateBaseCode()
+}
+
+// Genera un invite_code único verificando contra la DB; reintenta si hay colisión
+async function generateUniqueInviteCode(): Promise<string> {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const code = generateBaseCode()
+    const existingGuilds = await db
+      .select({ id: guilds.id })
+      .from(guilds)
+      .where(eq(guilds.inviteCode, code))
+      .limit(1)
+    if (existingGuilds.length === 0) return code
+  }
+  throw new Error('No se pudo generar un código de invitación único tras varios intentos')
+}
 
 export const createGuild = createServerFn({ method: 'POST' })
   .inputValidator(createGuildSchema)
@@ -19,6 +55,7 @@ export const createGuild = createServerFn({ method: 'POST' })
     }
 
     const ownerId = session.user.id
+    const inviteCode = await generateUniqueInviteCode()
 
     try {
       // Transacción: crear el guild y su membresía de dueño de forma atómica
@@ -30,6 +67,7 @@ export const createGuild = createServerFn({ method: 'POST' })
             slug: data.slug,
             description: data.description ?? null,
             ownerId,
+            inviteCode,
           })
           .returning()
 

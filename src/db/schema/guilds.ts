@@ -14,6 +14,8 @@ export const guilds = pgTable('guilds', {
   name: text('name').notNull(),
   // slug único usado en URLs: /guilds/dev-guild
   slug: text('slug').notNull().unique(),
+  // código de invitación corto, generado automáticamente al crear el guild
+  inviteCode: text('invite_code').notNull().unique(),
   description: text('description'),
   // dueño/fundador del guild — se replica la convención de cascada de quests
   ownerId: text('owner_id')

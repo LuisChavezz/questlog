@@ -24,9 +24,6 @@ import { cn } from '#/lib/utils'
 
 type GuildRole = 'owner' | 'admin' | 'member'
 
-// Mock: role del usuario en el guild — se reemplazará con datos reales del contexto
-const MOCK_ROLE: GuildRole = 'owner'
-
 // Rutas tipadas de TanStack Router para las sub-páginas del guild
 type GuildSubRoutePath =
   | '/guilds/$slug'
@@ -48,7 +45,7 @@ type SubNavItem = {
 }
 
 function buildSubNavItems(slug: string, role: GuildRole): SubNavItem[] {
-  const isAdmin = role === 'owner' || role === 'admin'
+  const isOwner = role === 'owner'
   const p = { slug }
   return [
     {
@@ -73,7 +70,7 @@ function buildSubNavItems(slug: string, role: GuildRole): SubNavItem[] {
       href: `/guilds/${slug}/members`,
       icon: Users,
     },
-    ...(isAdmin
+    ...(isOwner
       ? [
           {
             label: 'Settings',
@@ -123,7 +120,8 @@ export function GuildNavItem({ isExpanded }: GuildNavItemProps) {
   })
   const guildName = guildDetail?.guild.name ?? slug ?? ''
 
-  const subItems = slug ? buildSubNavItems(slug, MOCK_ROLE) : []
+  const currentUserRole = guildDetail?.currentUserRole ?? 'member'
+  const subItems = slug ? buildSubNavItems(slug, currentUserRole) : []
 
   // --- Modo colapsado ---
   if (!isExpanded) {

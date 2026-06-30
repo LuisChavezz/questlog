@@ -68,3 +68,10 @@ export type CreateGuildValues = z.infer<typeof createGuildSchema>
 export const getGuildInputSchema = z.object({
   slug: guildSlugSchema,
 })
+
+// ─── Esquema de regeneración de invite code ───────────────────────────────────
+
+/** Esquema de entrada para regenerar el invite code de un guild */
+export const regenerateInviteCodeSchema = z.object({
+  guildId: z.string().min(1),
+})
