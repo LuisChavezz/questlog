@@ -94,6 +94,7 @@ export const getGuild = createServerFn({ method: 'GET' })
           userId: guildMembers.userId,
           name: user.name,
           image: user.image,
+          avatarId: user.avatarId,
           role: guildMembers.role,
           joinedAt: guildMembers.joinedAt,
         })

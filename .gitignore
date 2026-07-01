@@ -32,6 +32,9 @@ pnpm-debug.log*
 # Tooling artifacts
 .cta.json
 
+# Fuente cruda de los avatares (pack CraftPix); solo se versiona la salida en public/avatars
+assets-source/
+
 # AI Agents
 .agents/
 .claude/

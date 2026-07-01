@@ -49,7 +49,11 @@ export const getGuildInvitePreview = createServerFn({ method: 'GET' })
         .from(guildMembers)
         .where(eq(guildMembers.guildId, guild.id)),
       db
-        .select({ name: user.name, image: user.image })
+        .select({
+          name: user.name,
+          image: user.image,
+          avatarId: user.avatarId,
+        })
         .from(guildMembers)
         .innerJoin(user, eq(guildMembers.userId, user.id))
         .where(eq(guildMembers.guildId, guild.id))
@@ -81,6 +85,7 @@ export const getGuildInvitePreview = createServerFn({ method: 'GET' })
         // ids, emails ni roles de los demás miembros.
         members: previewMembers.map((m) => ({
           image: m.image,
+          avatarId: m.avatarId,
           initials: m.name
             .split(' ')
             .slice(0, 2)

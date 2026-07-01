@@ -43,9 +43,12 @@ export const guildMembersRelations = relations(guildMembers, ({ one }) => ({
   }),
 }))
 
-// Back-relation de user → guild_members. Se define aquí porque auth-schema.ts
-// es propiedad de Better Auth y no debe editarse a mano.
-export const userRelations = relations(user, ({ many }) => ({
+// Back-relation de user → guild_members. Se define aquí (con nombre propio,
+// distinto de `userRelations`) porque auth-schema.ts es generado por Better
+// Auth y ya exporta su propio `userRelations` (sessions/accounts); Drizzle
+// combina ambos `relations(user, ...)` para la misma tabla en tiempo de
+// ejecución, pero los nombres de export deben ser únicos para el barrel.
+export const guildMembersUserRelations = relations(user, ({ many }) => ({
   guildMemberships: many(guildMembers),
 }))
 

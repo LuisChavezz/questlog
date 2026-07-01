@@ -57,6 +57,20 @@
       "when": 1782843351392,
       "tag": "0007_white_peter_parker",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1782929734771,
+      "tag": "0008_curvy_electro",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1782941092433,
+      "tag": "0009_safe_newton_destine",
+      "breakpoints": true
     }
   ]
 }

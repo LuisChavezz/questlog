@@ -30,12 +30,18 @@ type SettingsDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   currentName: string
+  currentEmail: string | null
+  currentImage: string | null
+  currentAvatarId: string | null
 }
 
 export function SettingsDialog({
   open,
   onOpenChange,
   currentName,
+  currentEmail,
+  currentImage,
+  currentAvatarId,
 }: SettingsDialogProps) {
   const [activeSection, setActiveSection] =
     useState<SettingsSectionId>('general')
@@ -78,7 +84,12 @@ export function SettingsDialog({
           {/* Panel derecho: contenido de la sección activa */}
           <div className="min-h-0 flex-1 overflow-y-auto p-6">
             {activeSection === 'general' && (
-              <SettingsGeneralSection currentName={currentName} />
+              <SettingsGeneralSection
+                currentName={currentName}
+                currentEmail={currentEmail}
+                currentImage={currentImage}
+                currentAvatarId={currentAvatarId}
+              />
             )}
           </div>
         </div>

@@ -28,6 +28,7 @@ export function AppHeader() {
         name={user?.name}
         email={user?.email}
         image={user?.image}
+        avatarId={user?.avatarId}
       />
     </header>
   )

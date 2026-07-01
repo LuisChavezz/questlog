@@ -3,12 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { CheckCircle2, Clock, Pencil, Plus } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarGroup,
-  AvatarGroupCount,
-} from '#/components/ui/avatar'
+import { AvatarGroup, AvatarGroupCount } from '#/components/ui/avatar'
+import { UserAvatar } from '#/components/user-avatar'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
 import { guildQueryOptions } from '../api/guild-query-options'
 import type { GuildDetail } from '../api/get-guild'
@@ -109,9 +105,13 @@ export function GuildOverview() {
               <div className="flex items-center gap-4">
                 <AvatarGroup>
                   {visibleMembers.map((member) => (
-                    <Avatar key={member.id} title={member.name}>
-                      <AvatarFallback>{member.initials}</AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                      key={member.id}
+                      title={member.name}
+                      name={member.name}
+                      avatarId={member.avatarId}
+                      initials={member.initials}
+                    />
                   ))}
                   {extraCount > 0 && (
                     <AvatarGroupCount>+{extraCount}</AvatarGroupCount>
@@ -132,7 +132,9 @@ export function GuildOverview() {
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             {recentActivity.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No recent activity.</p>
+              <p className="text-sm text-muted-foreground">
+                No recent activity.
+              </p>
             ) : (
               recentActivity.map((item) => {
                 const Icon = STATUS_ICON[item.status]
@@ -146,7 +148,8 @@ export function GuildOverview() {
                         {item.title}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {STATUS_LABEL[item.status]} · {getRelativeTime(item.updatedAt)}
+                        {STATUS_LABEL[item.status]} ·{' '}
+                        {getRelativeTime(item.updatedAt)}
                       </p>
                     </div>
                   </div>

@@ -17,5 +17,17 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  user: {
+    // Campos extra del usuario. `avatarId` referencia una entrada del catálogo
+    // estático (avatarCatalog); se expone en la sesión pero solo el servidor
+    // puede escribirlo (input: false) para evitar valores arbitrarios del cliente.
+    additionalFields: {
+      avatarId: {
+        type: 'string',
+        required: false,
+        input: false,
+      },
+    },
+  },
   plugins: [tanstackStartCookies()],
 })

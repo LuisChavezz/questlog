@@ -2,13 +2,8 @@ import { Link } from '@tanstack/react-router'
 import { ScrollText } from 'lucide-react'
 import type { ReactNode } from 'react'
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarGroup,
-  AvatarGroupCount,
-  AvatarImage,
-} from '#/components/ui/avatar'
+import { AvatarGroup, AvatarGroupCount } from '#/components/ui/avatar'
+import { UserAvatar } from '#/components/user-avatar'
 import { Button } from '#/components/ui/button'
 import { useJoinGuild } from '../hooks/use-join-guild'
 import type { GuildInvitePreview } from '../api/get-guild-invite-preview'
@@ -158,10 +153,13 @@ function InvitePreviewCard({
           {preview.members.length > 0 && (
             <AvatarGroup>
               {preview.members.map((member, index) => (
-                <Avatar key={index}>
-                  {member.image && <AvatarImage src={member.image} alt="" />}
-                  <AvatarFallback>{member.initials}</AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  key={index}
+                  image={member.image}
+                  avatarId={member.avatarId}
+                  initials={member.initials}
+                  decorative
+                />
               ))}
               {extraCount > 0 && (
                 <AvatarGroupCount>+{extraCount}</AvatarGroupCount>
