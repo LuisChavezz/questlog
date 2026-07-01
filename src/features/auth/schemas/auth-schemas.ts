@@ -38,3 +38,28 @@ export const registerSchema = z
 
 export type LoginValues = z.infer<typeof loginSchema>
 export type RegisterValues = z.infer<typeof registerSchema>
+
+// ─── Redirección post-autenticación ────────────────────────────────────────
+
+/**
+ * Search params de las rutas de auth. `redirect` permite volver a la URL de
+ * origen tras iniciar sesión o registrarse (p. ej. una invitación a un guild).
+ * `.catch(undefined)` evita que un valor malformado rompa la navegación.
+ */
+export const authSearchSchema = z.object({
+  redirect: z.string().optional().catch(undefined),
+})
+
+export type AuthSearch = z.infer<typeof authSearchSchema>
+
+/**
+ * Devuelve un destino de redirección seguro. Solo se permiten rutas internas
+ * que empiezan con "/" (y no "//", que el navegador interpreta como URL
+ * protocol-relative). Así se evita un open-redirect hacia dominios externos.
+ */
+export function getSafeRedirect(redirect: string | undefined): string {
+  if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+    return redirect
+  }
+  return '/dashboard'
+}

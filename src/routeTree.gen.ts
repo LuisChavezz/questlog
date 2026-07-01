@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as InviteCodeRouteImport } from './routes/invite/$code'
 import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
 import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AppQuestsRouteImport } from './routes/_app/quests'
@@ -35,6 +36,11 @@ const AppRoute = AppRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InviteCodeRoute = InviteCodeRouteImport.update({
+  id: '/invite/$code',
+  path: '/invite/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRegisterRoute = AuthRegisterRouteImport.update({
@@ -99,6 +105,7 @@ export interface FileRoutesByFullPath {
   '/quests': typeof AppQuestsRoute
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
+  '/invite/$code': typeof InviteCodeRoute
   '/guilds/$slug': typeof AppGuildsSlugRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/guilds/': typeof AppGuildsIndexRoute
@@ -113,6 +120,7 @@ export interface FileRoutesByTo {
   '/quests': typeof AppQuestsRoute
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
+  '/invite/$code': typeof InviteCodeRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/guilds': typeof AppGuildsIndexRoute
   '/guilds/$slug/members': typeof AppGuildsSlugMembersRoute
@@ -129,6 +137,7 @@ export interface FileRoutesById {
   '/_app/quests': typeof AppQuestsRoute
   '/_auth/login': typeof AuthLoginRoute
   '/_auth/register': typeof AuthRegisterRoute
+  '/invite/$code': typeof InviteCodeRoute
   '/_app/guilds/$slug': typeof AppGuildsSlugRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_app/guilds/': typeof AppGuildsIndexRoute
@@ -145,6 +154,7 @@ export interface FileRouteTypes {
     | '/quests'
     | '/login'
     | '/register'
+    | '/invite/$code'
     | '/guilds/$slug'
     | '/api/auth/$'
     | '/guilds/'
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/quests'
     | '/login'
     | '/register'
+    | '/invite/$code'
     | '/api/auth/$'
     | '/guilds'
     | '/guilds/$slug/members'
@@ -174,6 +185,7 @@ export interface FileRouteTypes {
     | '/_app/quests'
     | '/_auth/login'
     | '/_auth/register'
+    | '/invite/$code'
     | '/_app/guilds/$slug'
     | '/api/auth/$'
     | '/_app/guilds/'
@@ -187,6 +199,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   AuthRoute: typeof AuthRouteWithChildren
+  InviteCodeRoute: typeof InviteCodeRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -211,6 +224,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invite/$code': {
+      id: '/invite/$code'
+      path: '/invite/$code'
+      fullPath: '/invite/$code'
+      preLoaderRoute: typeof InviteCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_auth/register': {
@@ -343,6 +363,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   AuthRoute: AuthRouteWithChildren,
+  InviteCodeRoute: InviteCodeRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

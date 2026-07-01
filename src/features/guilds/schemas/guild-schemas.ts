@@ -75,3 +75,23 @@ export const getGuildInputSchema = z.object({
 export const regenerateInviteCodeSchema = z.object({
   guildId: z.string().min(1),
 })
+
+// ─── Esquemas de invitación (preview público + unirse) ─────────────────────────
+
+/** Código de invitación: cadena no vacía. La validez real se verifica en la DB. */
+export const inviteCodeSchema = z.string().min(1, 'Invite code is required')
+
+/** Construye la URL de invitación a partir del código, evitando rutas hardcodeadas duplicadas. */
+export function getInviteUrl(code: string, origin = '') {
+  return `${origin}/invite/${code}`
+}
+
+/** Esquema de entrada para previsualizar una invitación por su código */
+export const getGuildInvitePreviewSchema = z.object({
+  code: inviteCodeSchema,
+})
+
+/** Esquema de entrada para unirse a un guild mediante su código de invitación */
+export const joinGuildSchema = z.object({
+  code: inviteCodeSchema,
+})

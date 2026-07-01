@@ -169,7 +169,7 @@ export function GuildNavItem({ isExpanded }: GuildNavItemProps) {
                     {/* Badge con la inicial del guild — distingue visualmente de "Guilds" */}
                     <span
                       className={cn(
-                        'flex h-[18px] w-[18px] items-center justify-center',
+                        'flex h-4.5 w-4.5 items-center justify-center',
                         'rounded text-[10px] font-bold uppercase',
                         'bg-muted text-muted-foreground',
                       )}

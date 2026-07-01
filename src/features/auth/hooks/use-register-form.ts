@@ -1,10 +1,11 @@
-import { useNavigate } from '@tanstack/react-router'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useForm } from '@tanstack/react-form'
 import { useState } from 'react'
 
 import { authClient } from '#/lib/auth-client'
 import {
   emailSchema,
+  getSafeRedirect,
   nameSchema,
   registerPasswordSchema,
 } from '../schemas/auth-schemas'
@@ -12,6 +13,8 @@ import {
 // Hook que encapsula la lógica del formulario de registro
 export function useRegisterForm() {
   const navigate = useNavigate()
+  // Destino tras registrarse: el `redirect` de la URL o el dashboard por defecto
+  const { redirect } = useSearch({ strict: false })
   const [serverError, setServerError] = useState<string | null>(null)
 
   const form = useForm({
@@ -31,11 +34,13 @@ export function useRegisterForm() {
       })
 
       if (error) {
-        setServerError(error.message ?? 'Could not create account. Please try again.')
+        setServerError(
+          error.message ?? 'Could not create account. Please try again.',
+        )
         return
       }
 
-      await navigate({ to: '/dashboard' })
+      await navigate({ to: getSafeRedirect(redirect) })
     },
   })
 

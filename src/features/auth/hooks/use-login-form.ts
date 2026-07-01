@@ -1,13 +1,19 @@
-import { useNavigate } from '@tanstack/react-router'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useForm } from '@tanstack/react-form'
 import { useState } from 'react'
 
 import { authClient } from '#/lib/auth-client'
-import { emailSchema, passwordSchema } from '../schemas/auth-schemas'
+import {
+  emailSchema,
+  getSafeRedirect,
+  passwordSchema,
+} from '../schemas/auth-schemas'
 
 // Hook que encapsula la lógica del formulario de inicio de sesión
 export function useLoginForm() {
   const navigate = useNavigate()
+  // Destino tras iniciar sesión: el `redirect` de la URL o el dashboard por defecto
+  const { redirect } = useSearch({ strict: false })
   const [serverError, setServerError] = useState<string | null>(null)
 
   const form = useForm({
@@ -24,11 +30,13 @@ export function useLoginForm() {
       })
 
       if (error) {
-        setServerError(error.message ?? 'Invalid credentials. Please try again.')
+        setServerError(
+          error.message ?? 'Invalid credentials. Please try again.',
+        )
         return
       }
 
-      await navigate({ to: '/dashboard' })
+      await navigate({ to: getSafeRedirect(redirect) })
     },
   })
 

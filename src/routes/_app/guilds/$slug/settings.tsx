@@ -10,6 +10,7 @@ import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { regenerateInviteCode } from '#/features/guilds/api/regenerate-invite-code'
 import { guildQueryOptions } from '#/features/guilds/api/guild-query-options'
+import { getInviteUrl } from '#/features/guilds/schemas/guild-schemas'
 import type { GuildDetail } from '#/features/guilds/api/get-guild'
 
 export const Route = createFileRoute('/_app/guilds/$slug/settings')({
@@ -49,7 +50,7 @@ function GuildSettingsPage() {
 
   const inviteCode = data?.guild.inviteCode ?? ''
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
-  const inviteLink = `${origin}/guilds/join/${inviteCode}`
+  const inviteLink = getInviteUrl(inviteCode, origin)
 
   async function copyToClipboard(text: string, setCopied: (v: boolean) => void) {
     await navigator.clipboard.writeText(text)
