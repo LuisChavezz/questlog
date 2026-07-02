@@ -78,7 +78,7 @@ export function AvatarPicker({
             fallbackClassName="bg-primary/10 text-primary text-base font-semibold"
           />
           {/* Overlay "Edit" al pasar el cursor */}
-          <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+          <span className="absolute inset-0 flex items-center justify-center rounded-full bg-primary/80 text-xs font-medium text-primary-foreground opacity-0 transition-opacity group-hover:opacity-100">
             Edit
           </span>
         </button>

@@ -5,7 +5,7 @@
 import type { ComponentProps } from 'react'
 
 import { Avatar, AvatarFallback, AvatarImage } from '#/components/ui/avatar'
-import { getUserInitials } from '#/components/layouts/header/get-user-initials'
+import { getUserInitials } from '#/lib/get-user-initials'
 import { getAvatarSrc } from '#/features/user/avatar-catalog'
 import { cn } from '#/lib/utils'
 

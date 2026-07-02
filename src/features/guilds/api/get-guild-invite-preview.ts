@@ -9,6 +9,7 @@ import { and, asc, count, eq } from 'drizzle-orm'
 import { db } from '#/db'
 import { guildMembers, guilds, user } from '#/db/schema'
 import { auth } from '#/lib/auth'
+import { getUserInitials } from '#/lib/get-user-initials'
 import { getGuildInvitePreviewSchema } from '../schemas/guild-schemas'
 
 // Avatares visibles en la tarjeta de invitación antes del contador "+N"
@@ -51,6 +52,7 @@ export const getGuildInvitePreview = createServerFn({ method: 'GET' })
       db
         .select({
           name: user.name,
+          email: user.email,
           image: user.image,
           avatarId: user.avatarId,
         })
@@ -86,11 +88,7 @@ export const getGuildInvitePreview = createServerFn({ method: 'GET' })
         members: previewMembers.map((m) => ({
           image: m.image,
           avatarId: m.avatarId,
-          initials: m.name
-            .split(' ')
-            .slice(0, 2)
-            .map((w) => w.charAt(0).toUpperCase())
-            .join(''),
+          initials: getUserInitials(m.name, m.email),
         })),
       },
       viewer: {
