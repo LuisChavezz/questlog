@@ -47,7 +47,7 @@ export function UserAvatar({
 
   return (
     <Avatar size={size} className={className} {...props}>
-      {src && <AvatarImage src={src} alt={displayName} />}
+      <AvatarImage src={src} alt={displayName} />
       <AvatarFallback className={cn(fallbackClassName)}>
         {fallback}
       </AvatarFallback>

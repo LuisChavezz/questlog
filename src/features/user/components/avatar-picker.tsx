@@ -1,7 +1,7 @@
 // AvatarPicker — trigger con el avatar actual + dialog con la grilla del catálogo.
 // Al elegir un avatar dispara la mutación optimista y solo cierra el dialog
 // si termina bien; si falla, se queda abierto mostrando el error inline.
-import { Ban } from 'lucide-react'
+import { Ban, Pencil } from 'lucide-react'
 import { useState } from 'react'
 
 import {
@@ -77,9 +77,10 @@ export function AvatarPicker({
             className="size-16"
             fallbackClassName="bg-primary/10 text-primary text-base font-semibold"
           />
-          {/* Overlay "Edit" al pasar el cursor */}
-          <span className="absolute inset-0 flex items-center justify-center rounded-full bg-primary/80 text-xs font-medium text-primary-foreground opacity-0 transition-opacity group-hover:opacity-100">
-            Edit
+          {/* Overlay al pasar el cursor */}
+          <span className="absolute inset-0 flex items-center justify-center rounded-full bg-primary/80 text-primary-foreground opacity-0 transition-opacity group-hover:opacity-100">
+            <Pencil className="size-5" aria-hidden="true" />
+            <span className="sr-only">Edit avatar</span>
           </span>
         </button>
       </DialogTrigger>
@@ -118,7 +119,7 @@ export function AvatarPicker({
                 name={name}
                 email={email}
                 className="size-full"
-                fallbackClassName="bg-muted text-muted-foreground text-xs font-semibold"
+                fallbackClassName="bg-muted text-muted-foreground text-lg font-semibold"
               />
               <span className="absolute -right-0.5 -bottom-0.5 flex size-5 items-center justify-center rounded-full border-2 border-background bg-muted-foreground text-background">
                 <Ban className="size-3" aria-hidden="true" />
