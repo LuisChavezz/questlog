@@ -69,6 +69,7 @@ export function InlineEditTitle({ value, onSave, className }: InlineEditTitlePro
           className,
         )}
         maxLength={100}
+        autoComplete="off"
         aria-label="Edit title"
       />
     )

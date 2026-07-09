@@ -72,7 +72,6 @@ export function RegisterPage() {
                       id={field.name}
                       type="text"
                       placeholder="Your name"
-                      autoComplete="name"
                       value={field.state.value}
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
@@ -118,7 +117,6 @@ export function RegisterPage() {
                       id={field.name}
                       type="email"
                       placeholder="you@example.com"
-                      autoComplete="email"
                       value={field.state.value}
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
@@ -164,7 +162,6 @@ export function RegisterPage() {
                       id={field.name}
                       type={showPassword ? 'text' : 'password'}
                       placeholder="Min. 8 characters"
-                      autoComplete="new-password"
                       value={field.state.value}
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
@@ -231,7 +228,6 @@ export function RegisterPage() {
                       id={field.name}
                       type={showConfirm ? 'text' : 'password'}
                       placeholder="Repeat your password"
-                      autoComplete="new-password"
                       value={field.state.value}
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}

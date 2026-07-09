@@ -71,7 +71,6 @@ export function LoginPage() {
                       id={field.name}
                       type="email"
                       placeholder="you@example.com"
-                      autoComplete="email"
                       value={field.state.value}
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
@@ -117,7 +116,6 @@ export function LoginPage() {
                       id={field.name}
                       type={showPassword ? 'text' : 'password'}
                       placeholder="••••••••"
-                      autoComplete="current-password"
                       value={field.state.value}
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}

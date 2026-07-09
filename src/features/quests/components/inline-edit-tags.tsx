@@ -68,6 +68,7 @@ export function InlineEditTags({ value, onSave }: InlineEditTagsProps) {
           }
         }}
         placeholder="tag1, tag2, tag3"
+        autoComplete="off"
         className={cn(
           'w-full rounded border border-ring bg-background px-1.5 py-0.5',
           'text-xs text-foreground outline-none',

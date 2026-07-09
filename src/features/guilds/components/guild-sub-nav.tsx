@@ -95,6 +95,15 @@ interface GuildNavItemProps {
   isExpanded: boolean
 }
 
+// Divisor entre "Guilds" y el bloque del guild activo (modo colapsado y expandido)
+function SidebarDivider() {
+  return (
+    <li aria-hidden="true">
+      <div className="mx-3 my-1 h-px bg-sidebar-border" />
+    </li>
+  )
+}
+
 // "Guilds" como enlace directo al directorio + encabezado de sección del guild activo.
 // En modo colapsado: ícono Guilds (directo) + ícono del guild con flyout de sub-ítems.
 // En modo expandido: enlace Guilds + encabezado de sección con chevron + sub-ítems.
@@ -152,63 +161,76 @@ export function GuildNavItem({ isExpanded }: GuildNavItemProps) {
 
         {/* Ícono del guild activo — flyout con sub-ítems del guild */}
         {slug && (
-          <li>
-            <DropdownMenu>
-              <Tooltip content={guildName} side="right">
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className={cn(
-                      'flex w-full items-center justify-center rounded-lg py-2 px-0',
-                      'text-sm font-medium cursor-pointer',
-                      'outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
-                      'transition-colors duration-150',
-                      'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
-                    )}
-                  >
-                    {/* Badge con la inicial del guild — distingue visualmente de "Guilds" */}
-                    <span
+          <>
+            <SidebarDivider />
+            <li>
+              <DropdownMenu>
+                <Tooltip content={guildName} side="right">
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
                       className={cn(
-                        'flex h-4.5 w-4.5 items-center justify-center',
-                        'rounded text-[10px] font-bold uppercase',
-                        'bg-muted text-muted-foreground',
+                        'flex w-full items-center justify-center rounded-lg py-2 px-0',
+                        'text-sm font-medium cursor-pointer',
+                        'outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                        'transition-colors duration-150',
+                        'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
                       )}
-                      aria-hidden="true"
                     >
-                      {guildName[0]}
-                    </span>
-                  </button>
-                </DropdownMenuTrigger>
-              </Tooltip>
-              <DropdownMenuContent side="right" align="start" sideOffset={8}>
-                {subItems.map((item) => {
-                  const Icon = item.icon
-                  const isActive = isSubItemActive(item, pathname)
-                  return (
-                    <DropdownMenuItem
-                      key={item.href}
-                      asChild
-                      className={isActive ? 'focus:bg-primary/10! focus:text-primary!' : undefined}
-                    >
-                      <Link
-                        to={item.to}
-                        params={item.params}
-                        activeProps={{}}
-                        inactiveProps={{}}
+                      {/* Badge con la inicial del guild — distingue visualmente de "Guilds" */}
+                      <span
                         className={cn(
-                          'flex items-center gap-2 cursor-pointer',
-                          isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground',
+                          'flex h-4.5 w-4.5 items-center justify-center',
+                          'rounded text-[10px] font-bold uppercase',
+                          'bg-muted text-muted-foreground',
                         )}
+                        aria-hidden="true"
                       >
-                        <Icon size={15} className="text-inherit" aria-hidden="true" />
-                        {item.label}
-                      </Link>
-                    </DropdownMenuItem>
-                  )
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </li>
+                        {guildName[0]}
+                      </span>
+                    </button>
+                  </DropdownMenuTrigger>
+                </Tooltip>
+                <DropdownMenuContent side="right" align="start" sideOffset={8}>
+                  {subItems.map((item) => {
+                    const Icon = item.icon
+                    const isActive = isSubItemActive(item, pathname)
+                    return (
+                      <DropdownMenuItem
+                        key={item.href}
+                        asChild
+                        className={
+                          isActive
+                            ? 'focus:bg-primary/10! focus:text-primary!'
+                            : undefined
+                        }
+                      >
+                        <Link
+                          to={item.to}
+                          params={item.params}
+                          activeProps={{}}
+                          inactiveProps={{}}
+                          className={cn(
+                            'flex items-center gap-2 cursor-pointer',
+                            isActive
+                              ? 'bg-primary/10 text-primary'
+                              : 'text-muted-foreground',
+                          )}
+                        >
+                          <Icon
+                            size={15}
+                            className="text-inherit"
+                            aria-hidden="true"
+                          />
+                          {item.label}
+                        </Link>
+                      </DropdownMenuItem>
+                    )
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </li>
+          </>
         )}
       </>
     )
@@ -239,13 +261,20 @@ export function GuildNavItem({ isExpanded }: GuildNavItemProps) {
         </Link>
       </li>
 
+      {/* Divisor entre "Guilds" y el bloque del guild activo */}
+      {slug && <SidebarDivider />}
+
       {/* Encabezado de sección del guild activo — solo alterna disclosure, no navega */}
       {slug && (
         <li>
           <button
             type="button"
             onClick={() => setIsSubNavOpen((prev) => !prev)}
-            aria-label={isSubNavOpen ? 'Collapse guild navigation' : 'Expand guild navigation'}
+            aria-label={
+              isSubNavOpen
+                ? 'Collapse guild navigation'
+                : 'Expand guild navigation'
+            }
             className={cn(
               'flex w-full items-center gap-2 rounded-lg py-1 px-2.5',
               'text-xs font-medium text-muted-foreground',
@@ -292,7 +321,9 @@ export function GuildNavItem({ isExpanded }: GuildNavItemProps) {
                 )}
               >
                 <Icon size={15} className="shrink-0" aria-hidden="true" />
-                <span className="overflow-hidden whitespace-nowrap">{item.label}</span>
+                <span className="overflow-hidden whitespace-nowrap">
+                  {item.label}
+                </span>
               </Link>
             </li>
           )
