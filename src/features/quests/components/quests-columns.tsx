@@ -24,6 +24,7 @@ import {
 
 import { ColumnHeader } from '#/components/ui/data-table'
 import { Checkbox } from '#/components/ui/checkbox'
+import { dateFormatter } from '#/lib/format-date'
 
 import type { Quest, QuestPriority, QuestStatus } from '#/db/schema'
 import type { UpdateQuestValues } from '../schemas/quest-schemas'
@@ -33,29 +34,36 @@ import { InlineEditBadge } from './inline-edit-badge'
 import { InlineEditDueDate } from './inline-edit-due-date'
 import { InlineEditTags } from './inline-edit-tags'
 
-// ─── Utilidad de formato de fecha ─────────────────────────────────────────────
-
-const dateFormatter = new Intl.DateTimeFormat('en', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-})
-
 // ─── Opciones de estado y prioridad ───────────────────────────────────────────
 
 export const STATUS_OPTIONS: readonly BadgeOption[] = [
   { value: 'backlog', label: 'Backlog', icon: Circle, variant: 'backlog' },
   { value: 'todo', label: 'To Do', icon: Clock, variant: 'todo' },
-  { value: 'in_progress', label: 'In Progress', icon: ArrowRight, variant: 'in_progress' },
+  {
+    value: 'in_progress',
+    label: 'In Progress',
+    icon: ArrowRight,
+    variant: 'in_progress',
+  },
   { value: 'done', label: 'Completed', icon: CheckCircle2, variant: 'done' },
-  { value: 'cancelled', label: 'Cancelled', icon: XCircle, variant: 'cancelled' },
+  {
+    value: 'cancelled',
+    label: 'Cancelled',
+    icon: XCircle,
+    variant: 'cancelled',
+  },
 ] as const
 
 export const PRIORITY_OPTIONS: readonly BadgeOption[] = [
   { value: 'low', label: 'Low', icon: ArrowDown, variant: 'low' },
   { value: 'medium', label: 'Medium', icon: MinusCircle, variant: 'medium' },
   { value: 'high', label: 'High', icon: ArrowUp, variant: 'high' },
-  { value: 'critical', label: 'Critical', icon: AlertCircle, variant: 'critical' },
+  {
+    value: 'critical',
+    label: 'Critical',
+    icon: AlertCircle,
+    variant: 'critical',
+  },
 ] as const
 
 // ─── Factory de columnas ──────────────────────────────────────────────────────
@@ -135,13 +143,16 @@ export function createQuestsColumns(
           <InlineEditBadge
             value={status}
             options={STATUS_OPTIONS}
-            onSave={(newStatus) => onUpdate({ id, status: newStatus as QuestStatus })}
+            onSave={(newStatus) =>
+              onUpdate({ id, status: newStatus as QuestStatus })
+            }
             label="status"
           />
         )
       },
       filterFn: (row, _columnId, filterValue: string[]) =>
-        filterValue.length === 0 || filterValue.includes(row.getValue('status')),
+        filterValue.length === 0 ||
+        filterValue.includes(row.getValue('status')),
     },
 
     // Priority (badge editable inline)
@@ -156,7 +167,9 @@ export function createQuestsColumns(
           <InlineEditBadge
             value={priority}
             options={PRIORITY_OPTIONS}
-            onSave={(newPriority) => onUpdate({ id, priority: newPriority as QuestPriority })}
+            onSave={(newPriority) =>
+              onUpdate({ id, priority: newPriority as QuestPriority })
+            }
             label="priority"
           />
         )
@@ -217,4 +230,3 @@ export function createQuestsColumns(
 }
 
 export const questsColumns = createQuestsColumns(() => {})
-

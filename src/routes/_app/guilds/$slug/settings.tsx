@@ -52,7 +52,10 @@ function GuildSettingsPage() {
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
   const inviteLink = getInviteUrl(inviteCode, origin)
 
-  async function copyToClipboard(text: string, setCopied: (v: boolean) => void) {
+  async function copyToClipboard(
+    text: string,
+    setCopied: (v: boolean) => void,
+  ) {
     await navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
@@ -68,14 +71,16 @@ function GuildSettingsPage() {
   return (
     <div className="flex flex-col gap-8 p-8 max-w-2xl">
       <div>
-        <h2 className="text-lg font-semibold text-foreground">Guild Settings</h2>
+        <h2 className="text-lg font-semibold text-foreground">
+          Guild Settings
+        </h2>
         <p className="text-sm text-muted-foreground mt-1">
           Manage your guild's invitation settings.
         </p>
       </div>
 
-      {/* Sección de invitación */}
-      <section className="flex flex-col gap-5">
+      {/* Sección de invitación — id como ancla de scroll desde el botón "Invite Member" */}
+      <section id="invitation" className="flex flex-col gap-5">
         <h3 className="text-sm font-medium text-foreground">Invitation</h3>
 
         {/* Campo de código de invitación */}

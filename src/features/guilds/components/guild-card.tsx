@@ -7,20 +7,7 @@ import { Link } from '@tanstack/react-router'
 import { Badge } from '#/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
 import type { GuildWithRole } from '../api/get-guilds'
-
-// Variante visual del badge según el rol del usuario en el guild
-const ROLE_BADGE_VARIANT = {
-  owner: 'default',
-  admin: 'secondary',
-  member: 'outline',
-} as const
-
-// Etiqueta legible del rol (UI en inglés)
-const ROLE_LABEL = {
-  owner: 'Owner',
-  admin: 'Admin',
-  member: 'Member',
-} as const
+import { ROLE_BADGE_VARIANT, ROLE_LABEL } from '../role-labels'
 
 type GuildCardProps = {
   guild: GuildWithRole

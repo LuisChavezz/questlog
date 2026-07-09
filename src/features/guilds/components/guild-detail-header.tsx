@@ -3,18 +3,7 @@ import { Shield } from 'lucide-react'
 
 import { Badge } from '#/components/ui/badge'
 import { guildQueryOptions } from '../api/guild-query-options'
-
-const ROLE_BADGE_VARIANT = {
-  owner: 'default',
-  admin: 'secondary',
-  member: 'outline',
-} as const
-
-const ROLE_LABEL = {
-  owner: 'Owner',
-  admin: 'Admin',
-  member: 'Member',
-} as const
+import { ROLE_BADGE_VARIANT, ROLE_LABEL } from '../role-labels'
 
 export function GuildDetailHeader({ slug }: { slug: string }) {
   const { data } = useQuery(guildQueryOptions(slug))
