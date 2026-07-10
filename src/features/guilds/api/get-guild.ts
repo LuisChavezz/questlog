@@ -7,6 +7,7 @@ import { db } from '#/db'
 import { guildMembers, guilds, quests, user } from '#/db/schema'
 import { auth } from '#/lib/auth'
 import { getUserInitials } from '#/lib/get-user-initials'
+import { isGuildOwner } from '../role-labels'
 import { getGuildInputSchema } from '../schemas/guild-schemas'
 
 export const getGuild = createServerFn({ method: 'GET' })
@@ -50,79 +51,89 @@ export const getGuild = createServerFn({ method: 'GET' })
 
     const { role: currentUserRole } = memberships[0]
 
+    // Dueño estructural (guilds.owner_id), no el rol — mismo criterio que
+    // transfer-guild-ownership.ts / leave-guild.ts, para no depender de un
+    // guild_members.role que ante un drift hipotético permitiría un bypass.
+    const isOwner = isGuildOwner(guild.ownerId, session.user.id)
+
     // Inicio de la semana actual (lunes a las 00:00:00 UTC)
     const inicioSemana = new Date()
-    inicioSemana.setDate(inicioSemana.getDate() - ((inicioSemana.getDay() + 6) % 7))
+    inicioSemana.setDate(
+      inicioSemana.getDate() - ((inicioSemana.getDay() + 6) % 7),
+    )
     inicioSemana.setUTCHours(0, 0, 0, 0)
 
     // Paso 3: stats, miembros y actividad reciente en paralelo
-    const [statsResult, membersResult, recentActivityResult] = await Promise.all([
-      // Stats: tres conteos de quests
-      Promise.all([
-        db
-          .select({ count: count() })
-          .from(quests)
-          .where(
-            and(
-              eq(quests.guildId, guild.id),
-              notInArray(quests.status, ['done', 'cancelled']),
+    const [statsResult, membersResult, recentActivityResult] =
+      await Promise.all([
+        // Stats: tres conteos de quests
+        Promise.all([
+          db
+            .select({ count: count() })
+            .from(quests)
+            .where(
+              and(
+                eq(quests.guildId, guild.id),
+                notInArray(quests.status, ['done', 'cancelled']),
+              ),
             ),
-          ),
-        db
-          .select({ count: count() })
-          .from(quests)
-          .where(
-            and(
-              eq(quests.guildId, guild.id),
-              eq(quests.status, 'in_progress'),
+          db
+            .select({ count: count() })
+            .from(quests)
+            .where(
+              and(
+                eq(quests.guildId, guild.id),
+                eq(quests.status, 'in_progress'),
+              ),
             ),
-          ),
-        db
-          .select({ count: count() })
-          .from(quests)
-          .where(
-            and(
-              eq(quests.guildId, guild.id),
-              eq(quests.status, 'done'),
-              gte(quests.updatedAt, inicioSemana),
+          db
+            .select({ count: count() })
+            .from(quests)
+            .where(
+              and(
+                eq(quests.guildId, guild.id),
+                eq(quests.status, 'done'),
+                gte(quests.updatedAt, inicioSemana),
+              ),
             ),
-          ),
-      ]),
-      // Miembros: guild_members JOIN users
-      db
-        .select({
-          id: guildMembers.id,
-          userId: guildMembers.userId,
-          name: user.name,
-          email: user.email,
-          image: user.image,
-          avatarId: user.avatarId,
-          role: guildMembers.role,
-          joinedAt: guildMembers.joinedAt,
-        })
-        .from(guildMembers)
-        .innerJoin(user, eq(guildMembers.userId, user.id))
-        .where(eq(guildMembers.guildId, guild.id))
-        .orderBy(asc(guildMembers.joinedAt)),
-      // Actividad reciente: últimas 5 quests ordenadas por fecha de actualización
-      db
-        .select({
-          id: quests.id,
-          title: quests.title,
-          status: quests.status,
-          updatedAt: quests.updatedAt,
-        })
-        .from(quests)
-        .where(eq(quests.guildId, guild.id))
-        .orderBy(desc(quests.updatedAt))
-        .limit(5),
-    ])
+        ]),
+        // Miembros: guild_members JOIN users
+        db
+          .select({
+            id: guildMembers.id,
+            userId: guildMembers.userId,
+            name: user.name,
+            email: user.email,
+            image: user.image,
+            avatarId: user.avatarId,
+            role: guildMembers.role,
+            joinedAt: guildMembers.joinedAt,
+          })
+          .from(guildMembers)
+          .innerJoin(user, eq(guildMembers.userId, user.id))
+          .where(eq(guildMembers.guildId, guild.id))
+          .orderBy(asc(guildMembers.joinedAt)),
+        // Actividad reciente: últimas 5 quests ordenadas por fecha de actualización
+        db
+          .select({
+            id: quests.id,
+            title: quests.title,
+            status: quests.status,
+            updatedAt: quests.updatedAt,
+          })
+          .from(quests)
+          .where(eq(quests.guildId, guild.id))
+          .orderBy(desc(quests.updatedAt))
+          .limit(5),
+      ])
 
     // COUNT() siempre devuelve exactamente una fila — desestructuración directa
     const [[activeRow], [inProgressRow], [completedWeekRow]] = statsResult
 
     return {
-      guild,
+      // El invite code solo se expone al owner — para el resto de miembros
+      // se omite del payload, no solo de la UI, así devtools/network no lo filtra.
+      guild: { ...guild, inviteCode: isOwner ? guild.inviteCode : null },
       currentUserRole,
       stats: {
         activeCount: activeRow.count,

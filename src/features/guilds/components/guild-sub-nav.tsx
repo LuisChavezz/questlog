@@ -22,8 +22,6 @@ import { Tooltip } from '#/components/ui/tooltip'
 import { guildQueryOptions } from '#/features/guilds/api/guild-query-options'
 import { cn } from '#/lib/utils'
 
-type GuildRole = 'owner' | 'admin' | 'member'
-
 // Rutas tipadas de TanStack Router para las sub-páginas del guild
 type GuildSubRoutePath =
   | '/guilds/$slug'
@@ -44,8 +42,9 @@ type SubNavItem = {
   exact?: boolean
 }
 
-function buildSubNavItems(slug: string, role: GuildRole): SubNavItem[] {
-  const isOwner = role === 'owner'
+// Settings es accesible para todos los miembros: las secciones owner-only se
+// filtran dentro de la propia página por rol.
+function buildSubNavItems(slug: string): SubNavItem[] {
   const p = { slug }
   return [
     {
@@ -70,17 +69,13 @@ function buildSubNavItems(slug: string, role: GuildRole): SubNavItem[] {
       href: `/guilds/${slug}/members`,
       icon: Users,
     },
-    ...(isOwner
-      ? [
-          {
-            label: 'Settings',
-            to: '/guilds/$slug/settings' as GuildSubRoutePath,
-            params: p,
-            href: `/guilds/${slug}/settings`,
-            icon: Settings2,
-          },
-        ]
-      : []),
+    {
+      label: 'Settings',
+      to: '/guilds/$slug/settings',
+      params: p,
+      href: `/guilds/${slug}/settings`,
+      icon: Settings2,
+    },
   ]
 }
 
@@ -129,8 +124,7 @@ export function GuildNavItem({ isExpanded }: GuildNavItemProps) {
   })
   const guildName = guildDetail?.guild.name ?? slug ?? ''
 
-  const currentUserRole = guildDetail?.currentUserRole ?? 'member'
-  const subItems = slug ? buildSubNavItems(slug, currentUserRole) : []
+  const subItems = slug ? buildSubNavItems(slug) : []
 
   // --- Modo colapsado ---
   if (!isExpanded) {

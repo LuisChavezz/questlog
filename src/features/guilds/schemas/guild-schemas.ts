@@ -95,3 +95,38 @@ export const getGuildInvitePreviewSchema = z.object({
 export const joinGuildSchema = z.object({
   code: inviteCodeSchema,
 })
+
+// ─── Esquemas de gestión de miembros ──────────────────────────────────────────
+
+/**
+ * Roles asignables vía la acción de cambio de rol. El rol `owner` es estructural
+ * (ligado a `guilds.owner_id`) y nunca se asigna por este flujo, por lo que se
+ * excluye deliberadamente del enum.
+ */
+export const assignableGuildRoleSchema = z.enum(['member', 'admin'])
+
+export type AssignableGuildRole = z.infer<typeof assignableGuildRoleSchema>
+
+/** Esquema de entrada para cambiar el rol de un miembro dentro de un guild */
+export const updateGuildMemberRoleSchema = z.object({
+  slug: guildSlugSchema,
+  userId: z.string().min(1),
+  newRole: assignableGuildRoleSchema,
+})
+
+/** Esquema de entrada para expulsar a un miembro de un guild */
+export const removeGuildMemberSchema = z.object({
+  slug: guildSlugSchema,
+  userId: z.string().min(1),
+})
+
+/** Esquema de entrada para transferir la propiedad de un guild a otro miembro */
+export const transferGuildOwnershipSchema = z.object({
+  slug: guildSlugSchema,
+  newOwnerUserId: z.string().min(1),
+})
+
+/** Esquema de entrada para abandonar un guild voluntariamente */
+export const leaveGuildSchema = z.object({
+  slug: guildSlugSchema,
+})
