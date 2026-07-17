@@ -12,9 +12,15 @@ import { Badge } from '#/components/ui/badge'
 interface InlineEditTagsProps {
   value: string[]
   onSave: (newTags: string[]) => void
+  /** Solo lectura: muestra las tags sin afordancia de edición */
+  readOnly?: boolean
 }
 
-export function InlineEditTags({ value, onSave }: InlineEditTagsProps) {
+export function InlineEditTags({
+  value,
+  onSave,
+  readOnly = false,
+}: InlineEditTagsProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value.join(', '))
   const inputRef = useRef<HTMLInputElement>(null)
@@ -48,6 +54,23 @@ export function InlineEditTags({ value, onSave }: InlineEditTagsProps) {
   const cancel = () => {
     setDraft(value.join(', '))
     setEditing(false)
+  }
+
+  // Solo lectura: mismos badges (o guion si no hay), sin botón de edición
+  if (readOnly) {
+    return (
+      <div className="flex flex-wrap items-center gap-1 px-1 py-0.5 -mx-1">
+        {value.length ? (
+          value.map((tag) => (
+            <Badge key={tag} variant="outline" className="py-0 text-xs">
+              {tag}
+            </Badge>
+          ))
+        ) : (
+          <span className="text-xs text-muted-foreground/50">—</span>
+        )}
+      </div>
+    )
   }
 
   if (editing) {

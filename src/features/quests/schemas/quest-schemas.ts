@@ -180,6 +180,27 @@ export const questPrioritySchema = z.enum(['low', 'medium', 'high', 'critical'])
 export const questTagsSchema = z.string().optional()
 
 /**
+ * Id del guild al que pertenece la quest. NULL/ausente = quest personal.
+ * Se valida como cadena no vacía; la existencia real y la membresía se verifican
+ * en el servidor contra guild_members.
+ *
+ * Hoy coincide con `questUserRefSchema` en su regla de validación, pero son
+ * conceptos distintos (id de guild vs. id de usuario) que solo comparten esa
+ * regla por casualidad — no se consolidan a propósito, para que un cambio futuro
+ * en uno (p. ej. un prefijo o formato propio de los ids de guild) no se aplique
+ * sin querer al otro por asumir que son lo mismo.
+ */
+export const questGuildIdSchema = z.string().min(1)
+
+/**
+ * Referencia a un usuario (asignado o supervisor). Cadena no vacía; que el
+ * usuario pertenezca al mismo guild de la quest se valida en el servidor.
+ *
+ * Ver la nota en `questGuildIdSchema`: mismo caso, distinto concepto.
+ */
+export const questUserRefSchema = z.string().min(1)
+
+/**
  * Fecha de vencimiento como string YYYY-MM-DD.
  * Rechaza fechas pasadas y fechas con formato inválido (e.g. 2024-02-30).
  * El string vacío se trata como ausencia de fecha (campo opcional).
@@ -200,14 +221,33 @@ export const questDueDateSchema = z
 /**
  * Esquema para crear una quest.
  * El estado inicial siempre se resuelve en el servidor como `backlog`.
+ *
+ * Campos de guild (`guildId`, `assigneeId`, `supervisorId`) son opcionales:
+ * ausentes en una quest personal. La regla `assignee/supervisor exigen guildId`
+ * se refuerza aquí (cross-field) y la pertenencia real al guild se valida en el
+ * servidor — el cliente nunca es la autoridad final.
  */
-export const createQuestSchema = z.object({
-  title: questTitleSchema,
-  description: questDescriptionSchema,
-  priority: questPrioritySchema.default('medium'),
-  tags: questTagsSchema,
-  dueDate: questDueDateSchema,
-})
+export const createQuestSchema = z
+  .object({
+    title: questTitleSchema,
+    description: questDescriptionSchema,
+    priority: questPrioritySchema.default('medium'),
+    tags: questTagsSchema,
+    dueDate: questDueDateSchema,
+    guildId: questGuildIdSchema.optional(),
+    assigneeId: questUserRefSchema.optional(),
+    supervisorId: questUserRefSchema.optional(),
+  })
+  .refine(
+    // Una quest personal (sin guildId) no tiene concepto de asignado/supervisor
+    (data) =>
+      data.guildId != null ||
+      (data.assigneeId == null && data.supervisorId == null),
+    {
+      message: 'Assignee and supervisor require a guild',
+      path: ['assigneeId'],
+    },
+  )
 
 export type CreateQuestValues = z.infer<typeof createQuestSchema>
 
@@ -225,6 +265,10 @@ export const updateQuestSchema = z.object({
   priority: questPrioritySchema.optional(),
   tags: z.array(z.string().max(50)).max(20).optional(),
   dueDate: questDueDateSchema,
+  // Asignado/supervisor: `undefined` omite el campo; `null` lo limpia; una
+  // cadena lo fija. La pertenencia al guild de la quest se valida en el servidor.
+  assigneeId: questUserRefSchema.nullable().optional(),
+  supervisorId: questUserRefSchema.nullable().optional(),
 })
 
 export type UpdateQuestValues = z.infer<typeof updateQuestSchema>

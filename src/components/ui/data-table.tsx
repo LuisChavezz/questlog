@@ -51,6 +51,12 @@ interface DataTableProps<TData extends RowData, TValue> {
   getRowId?: (originalRow: TData, index: number, parent?: Row<TData>) => string
   stateStorageKey?: string
   enableColumnResizing?: boolean
+  /**
+   * Habilita la selección de filas. `true` (por defecto) todas; un predicado
+   * permite gatear por fila — TanStack respeta `getCanSelect()` también en el
+   * "seleccionar todo" del header y en las acciones masivas.
+   */
+  enableRowSelection?: boolean | ((row: Row<TData>) => boolean)
   bulkActions?: DataTableBulkAction<TData>[]
   /** Slot derecho de la toolbar: acciones como botones de creación, filtros, etc. */
   actions?: React.ReactNode
@@ -77,6 +83,7 @@ export function DataTable<TData extends RowData, TValue>({
   getRowId,
   stateStorageKey,
   enableColumnResizing = true,
+  enableRowSelection = true,
   bulkActions = [],
   actions,
 }: DataTableProps<TData, TValue>) {
@@ -160,7 +167,7 @@ export function DataTable<TData extends RowData, TValue>({
     onRowSelectionChange: handleRowSelectionChange,
     onColumnSizingChange: setColumnSizing,
     getRowId,
-    enableRowSelection: true,
+    enableRowSelection,
     enableColumnResizing,
     columnResizeMode: 'onChange',
     defaultColumn: {

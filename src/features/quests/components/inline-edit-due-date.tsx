@@ -29,9 +29,15 @@ interface InlineEditDueDateProps {
   value: Date | null
   /** Callback invocado con el nuevo valor YYYY-MM-DD al confirmar. '' borra la fecha. */
   onSave: (newValue: string) => void
+  /** Solo lectura: muestra la fecha sin afordancia de edición */
+  readOnly?: boolean
 }
 
-export function InlineEditDueDate({ value, onSave }: InlineEditDueDateProps) {
+export function InlineEditDueDate({
+  value,
+  onSave,
+  readOnly = false,
+}: InlineEditDueDateProps) {
   // false = modo lectura; true = modo edición
   const [editing, setEditing] = useState(false)
   // Valor del input en formato YYYY-MM-DD mientras el usuario edita
@@ -98,6 +104,39 @@ export function InlineEditDueDate({ value, onSave }: InlineEditDueDateProps) {
     setDraft(currentValue)
     setError(null)
     setEditing(false)
+  }
+
+  // ─── Modo solo lectura ───────────────────────────────────────────────────────
+  // Mismo ícono + texto (con coloreado de vencida) pero sin botón ni lápiz.
+
+  if (readOnly) {
+    return (
+      <span className="flex items-center gap-1.5 px-1.5 py-0.5 -mx-1.5">
+        <Calendar
+          className={cn(
+            'size-3.5 shrink-0',
+            currentValue
+              ? isOverdue
+                ? 'text-destructive'
+                : 'text-muted-foreground'
+              : 'text-muted-foreground/50',
+          )}
+          aria-hidden="true"
+        />
+        <span
+          className={cn(
+            'min-w-0 truncate text-sm tabular-nums',
+            currentValue
+              ? isOverdue
+                ? 'text-destructive'
+                : 'text-muted-foreground'
+              : 'text-muted-foreground/50',
+          )}
+        >
+          {value ? formatQuestDueDate(value) : '—'}
+        </span>
+      </span>
+    )
   }
 
   // ─── Modo edición ────────────────────────────────────────────────────────────

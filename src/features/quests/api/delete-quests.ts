@@ -1,12 +1,12 @@
-// Función de servidor — elimina múltiples quests del usuario autenticado
+// Función de servidor — elimina múltiples quests del usuario autenticado. Solo
+// el envoltorio RPC: resuelve la sesión y delega en `deleteQuestsHandler`, que
+// vive aparte para poder testearse directamente (ver delete-quests.handler.ts).
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
-import { and, eq, inArray } from 'drizzle-orm'
 
-import { db } from '#/db'
-import { quests } from '#/db/schema'
 import { auth } from '#/lib/auth'
 import { deleteQuestsSchema } from '../schemas/quest-schemas'
+import { deleteQuestsHandler } from './delete-quests.handler'
 
 export const deleteQuests = createServerFn({ method: 'POST' })
   .inputValidator(deleteQuestsSchema)
@@ -19,19 +19,7 @@ export const deleteQuests = createServerFn({ method: 'POST' })
       throw new Error('Unauthorized: must be signed in to delete quests')
     }
 
-    // La cláusula WHERE combina inArray con ownerId para eliminar solo las quests
-    // seleccionadas que pertenecen al usuario y evitar eliminaciones cruzadas
-    const deleted = await db
-      .delete(quests)
-      .where(
-        and(
-          inArray(quests.id, data.ids),
-          eq(quests.ownerId, session.user.id),
-        ),
-      )
-      .returning()
-
-    return deleted
+    return deleteQuestsHandler(data, session.user.id)
   })
 
 export type DeletedQuests = Awaited<ReturnType<typeof deleteQuests>>

@@ -1,14 +1,12 @@
-// Acción de servidor — crea una nueva quest asociada al usuario autenticado
+// Acción de servidor — crea una nueva quest asociada al usuario autenticado.
+// Solo el envoltorio RPC: resuelve la sesión y delega en `createQuestHandler`,
+// que vive aparte para poder testearse directamente (ver create-quest.handler.ts).
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
 
-import { db } from '#/db'
-import { quests } from '#/db/schema'
 import { auth } from '#/lib/auth'
-import {
-  createQuestSchema,
-  parseQuestDueDateValue,
-} from '../schemas/quest-schemas'
+import { createQuestSchema } from '../schemas/quest-schemas'
+import { createQuestHandler } from './create-quest.handler'
 
 export const createQuest = createServerFn({ method: 'POST' })
   .inputValidator(createQuestSchema)
@@ -21,31 +19,7 @@ export const createQuest = createServerFn({ method: 'POST' })
       throw new Error('Unauthorized: must be signed in to create a quest')
     }
 
-    // Transformar tags de string CSV a array de strings limpias
-    const tagsArray = data.tags
-      ? data.tags
-          .split(',')
-          .map((t: string) => t.trim())
-          .filter(Boolean)
-      : []
-
-    // Transformar dueDate de string a Date si está presente
-    const dueDate = parseQuestDueDateValue(data.dueDate ?? '')
-
-    const [quest] = await db
-      .insert(quests)
-      .values({
-        ownerId: session.user.id,
-        title: data.title,
-        description: data.description ?? null,
-        status: 'backlog',
-        priority: data.priority,
-        tags: tagsArray,
-        dueDate,
-      })
-      .returning()
-
-    return quest
+    return createQuestHandler(data, session.user.id)
   })
 
 // Tipo de retorno de la acción

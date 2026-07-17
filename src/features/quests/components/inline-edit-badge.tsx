@@ -27,13 +27,31 @@ interface InlineEditBadgeProps {
   onSave: (newValue: string) => void
   /** Describe el campo — usado en el aria-label del trigger */
   label: string
+  /** Solo lectura: muestra el badge sin dropdown de edición */
+  readOnly?: boolean
 }
 
-export function InlineEditBadge({ value, options, onSave, label }: InlineEditBadgeProps) {
+export function InlineEditBadge({
+  value,
+  options,
+  onSave,
+  label,
+  readOnly = false,
+}: InlineEditBadgeProps) {
   const current = options.find((o) => o.value === value)
   if (!current) return null
 
   const CurrentIcon = current.icon
+
+  // Solo lectura: mismo badge, sin trigger ni hover interactivo
+  if (readOnly) {
+    return (
+      <Badge variant={current.variant}>
+        <CurrentIcon className="size-3" />
+        {current.label}
+      </Badge>
+    )
+  }
 
   return (
     <DropdownMenu>

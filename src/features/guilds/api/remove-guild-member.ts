@@ -7,7 +7,7 @@ import { getRequest } from '@tanstack/react-start/server'
 import { and, eq, inArray } from 'drizzle-orm'
 
 import { db } from '#/db'
-import { guildMembers, guilds } from '#/db/schema'
+import { guildMembers, guilds, quests } from '#/db/schema'
 import { auth } from '#/lib/auth'
 import { canRemoveMember, isGuildOwner } from '../role-labels'
 import type { GuildMemberViewer } from '../role-labels'
@@ -172,6 +172,31 @@ export const removeGuildMember = createServerFn({ method: 'POST' })
       if (deleted.length === 0) {
         throw new Error('Not Found: member not found in this guild')
       }
+
+      // Limpiar asignado/supervisor: el expulsado deja de ser miembro, así que
+      // ninguna quest del guild puede seguir apuntándolo en esos campos. Misma
+      // transacción que el borrado de la membresía — no debe existir un instante
+      // en que la membresía ya no exista pero la referencia siga viva. Solo
+      // afecta a quests DE ESTE guild (por eq(quests.guildId, ...)); si el usuario
+      // es asignado/supervisor en otro guild, esa referencia no se toca. El
+      // creador (ownerId) tampoco se toca: el rol de guild no retroactivamente
+      // le quita la autoría de sus quests.
+      await tx
+        .update(quests)
+        .set({ assigneeId: null })
+        .where(
+          and(eq(quests.guildId, guild.id), eq(quests.assigneeId, data.userId)),
+        )
+
+      await tx
+        .update(quests)
+        .set({ supervisorId: null })
+        .where(
+          and(
+            eq(quests.guildId, guild.id),
+            eq(quests.supervisorId, data.userId),
+          ),
+        )
 
       return { userId: data.userId }
     })

@@ -12,9 +12,16 @@ interface InlineEditTitleProps {
   value: string
   onSave: (newValue: string) => void
   className?: string
+  /** Solo lectura: muestra el título sin afordancia de edición */
+  readOnly?: boolean
 }
 
-export function InlineEditTitle({ value, onSave, className }: InlineEditTitleProps) {
+export function InlineEditTitle({
+  value,
+  onSave,
+  className,
+  readOnly = false,
+}: InlineEditTitleProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -43,6 +50,20 @@ export function InlineEditTitle({ value, onSave, className }: InlineEditTitlePro
   const cancel = () => {
     setDraft(value)
     setEditing(false)
+  }
+
+  // Solo lectura: mismo texto, sin botón ni lápiz de edición
+  if (readOnly) {
+    return (
+      <span
+        className={cn(
+          'block truncate px-1.5 py-0.5 -mx-1.5 font-medium text-foreground',
+          className,
+        )}
+      >
+        {value}
+      </span>
+    )
   }
 
   if (editing) {

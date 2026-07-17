@@ -1,5 +1,9 @@
 /**
- * CreateQuestDialog — modal con formulario para crear una nueva quest.
+ * CreateQuestDialog — modal con formulario para crear una nueva quest, personal
+ * o de guild. En contexto de guild (prop `guild` presente) añade los selectores
+ * de asignado y supervisor poblados con los miembros del guild y ajusta el
+ * título; el resto de campos y la lógica son idénticos en ambos casos, por eso
+ * es un único componente parametrizado y no dos casi iguales.
  * La lógica del formulario vive en useCreateQuestForm (separada del UI).
  */
 import { Plus } from 'lucide-react'
@@ -26,21 +30,32 @@ import { Textarea } from '#/components/ui/textarea'
 import { useState } from 'react'
 
 import { useCreateQuestForm } from '../hooks/use-create-quest-form'
+import { PRIORITY_OPTIONS } from './quests-columns'
+import type { MemberOption } from './member-select'
+import { MemberSelect } from './member-select'
 
-const PRIORITY_OPTIONS = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-  { value: 'critical', label: 'Critical' },
-] as const
+// Contexto de guild para el diálogo: activa los selectores de asignado y
+// supervisor y aporta lo necesario para crear la quest en el guild. Ausente en
+// la vista personal.
+interface CreateQuestDialogGuild {
+  guildId: string
+  slug: string
+  // Miembros del guild — misma lista para los dos selectores
+  members: MemberOption[]
+}
+
+interface CreateQuestDialogProps {
+  guild?: CreateQuestDialogGuild
+}
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
-export function CreateQuestDialog() {
+export function CreateQuestDialog({ guild }: CreateQuestDialogProps = {}) {
   const [open, setOpen] = useState(false)
 
-  const { form, validators, serverError, minDueDate } = useCreateQuestForm(() => {
-    setOpen(false)
+  const { form, validators, serverError, minDueDate } = useCreateQuestForm({
+    guild: guild && { guildId: guild.guildId, slug: guild.slug },
+    onSuccess: () => setOpen(false),
   })
 
   return (
@@ -54,7 +69,9 @@ export function CreateQuestDialog() {
 
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Create Quest</DialogTitle>
+          <DialogTitle>
+            {guild ? 'Create Guild Quest' : 'Create Quest'}
+          </DialogTitle>
           <DialogDescription>
             New quests are always created in Backlog.
           </DialogDescription>
@@ -73,8 +90,7 @@ export function CreateQuestDialog() {
           <form.Field name="title" validators={validators.title}>
             {(field) => {
               const hasError =
-                field.state.meta.isTouched &&
-                field.state.meta.errors.length > 0
+                field.state.meta.isTouched && field.state.meta.errors.length > 0
               return (
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor={field.name}>
@@ -103,8 +119,7 @@ export function CreateQuestDialog() {
           <form.Field name="description" validators={validators.description}>
             {(field) => {
               const hasError =
-                field.state.meta.isTouched &&
-                field.state.meta.errors.length > 0
+                field.state.meta.isTouched && field.state.meta.errors.length > 0
               return (
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor={field.name}>Description</Label>
@@ -136,9 +151,14 @@ export function CreateQuestDialog() {
                 <Label htmlFor={`${field.name}-trigger`}>Priority</Label>
                 <Select
                   value={field.state.value}
-                  onValueChange={(val) => field.handleChange(val as typeof field.state.value)}
+                  onValueChange={(val) =>
+                    field.handleChange(val as typeof field.state.value)
+                  }
                 >
-                  <SelectTrigger id={`${field.name}-trigger`} className="w-full">
+                  <SelectTrigger
+                    id={`${field.name}-trigger`}
+                    className="w-full"
+                  >
                     <SelectValue placeholder="Select priority" />
                   </SelectTrigger>
                   <SelectContent>
@@ -152,6 +172,48 @@ export function CreateQuestDialog() {
               </div>
             )}
           </form.Field>
+
+          {/* Campos de guild: Assignee y Supervisor — misma lista de miembros.
+              Solo se renderizan en contexto de guild. */}
+          {guild && (
+            <div className="flex flex-col gap-5 sm:flex-row sm:gap-4">
+              <form.Field name="assigneeId">
+                {(field) => (
+                  <div className="flex flex-1 flex-col gap-1.5">
+                    <Label htmlFor={`${field.name}-trigger`}>Assignee</Label>
+                    <MemberSelect
+                      id={`${field.name}-trigger`}
+                      aria-label="Assignee"
+                      value={field.state.value ?? null}
+                      options={guild.members}
+                      onChange={(userId) =>
+                        field.handleChange(userId ?? undefined)
+                      }
+                      triggerClassName="w-full"
+                    />
+                  </div>
+                )}
+              </form.Field>
+
+              <form.Field name="supervisorId">
+                {(field) => (
+                  <div className="flex flex-1 flex-col gap-1.5">
+                    <Label htmlFor={`${field.name}-trigger`}>Supervisor</Label>
+                    <MemberSelect
+                      id={`${field.name}-trigger`}
+                      aria-label="Supervisor"
+                      value={field.state.value ?? null}
+                      options={guild.members}
+                      onChange={(userId) =>
+                        field.handleChange(userId ?? undefined)
+                      }
+                      triggerClassName="w-full"
+                    />
+                  </div>
+                )}
+              </form.Field>
+            </div>
+          )}
 
           {/* Campo: Tags */}
           <form.Field name="tags">
@@ -174,8 +236,7 @@ export function CreateQuestDialog() {
           <form.Field name="dueDate" validators={validators.dueDate}>
             {(field) => {
               const hasError =
-                field.state.meta.isTouched &&
-                field.state.meta.errors.length > 0
+                field.state.meta.isTouched && field.state.meta.errors.length > 0
 
               return (
                 <div className="flex flex-col gap-1.5">
