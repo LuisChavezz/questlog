@@ -261,6 +261,7 @@ export type CreateQuestValues = z.infer<typeof createQuestSchema>
 export const updateQuestSchema = z.object({
   id: z.string().uuid(),
   title: questTitleSchema.optional(),
+  description: questDescriptionSchema,
   status: questStatusSchema.optional(),
   priority: questPrioritySchema.optional(),
   tags: z.array(z.string().max(50)).max(20).optional(),

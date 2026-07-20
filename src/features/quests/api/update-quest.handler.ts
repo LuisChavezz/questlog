@@ -33,6 +33,10 @@ export async function updateQuestHandler(
     updatePayload.title = data.title
   }
 
+  if (data.description !== undefined) {
+    updatePayload.description = data.description.trim() || null
+  }
+
   if (data.status !== undefined) {
     updatePayload.status = data.status
     // Registrar la fecha de finalización cuando la quest se marca como completada
@@ -74,6 +78,7 @@ export async function updateQuestHandler(
   // ¿Toca algún campo de gestión (eje 1) o solo el estado (eje 2)?
   const touchesManagementField =
     data.title !== undefined ||
+    data.description !== undefined ||
     data.priority !== undefined ||
     data.tags !== undefined ||
     data.dueDate !== undefined ||

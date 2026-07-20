@@ -34,6 +34,7 @@ import {
 } from './quests-columns'
 import type { QuestsColumnsGuildContext } from './quests-columns'
 import { InlineEditBadge } from './inline-edit-badge'
+import { InlineEditDescription } from './inline-edit-description'
 import { InlineEditDueDate } from './inline-edit-due-date'
 import { InlineEditTags } from './inline-edit-tags'
 import { InlineEditTitle } from './inline-edit-title'
@@ -131,32 +132,31 @@ function QuestDetailsContent({
 
   return (
     <div className="flex h-full flex-col">
-      <SheetHeader>
+      <SheetHeader className="pr-12">
         {/* Título accesible para el Dialog (sr-only); la afordancia visible e
             interactiva es InlineEditTitle, que cambia de elemento raíz según
             el modo (botón/input/span) y por eso no puede vivir dentro de
-            SheetTitle asChild. */}
+            SheetTitle asChild. El pr-12 del header (en vez de solo padding
+            interno del input) es lo que deja un espacio real entre el borde
+            del input y el botón de cerrar — el padding interno no mueve el
+            borde, solo el texto. */}
         <SheetTitle className="sr-only">{quest.title}</SheetTitle>
         <InlineEditTitle
           value={quest.title}
           onSave={(title) => onUpdate({ id: quest.id, title })}
           readOnly={!canManage}
-          className="pr-8 text-base"
+          className="text-base"
         />
       </SheetHeader>
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="flex flex-col gap-6">
           <DetailField icon={ScrollText} label="Description">
-            {quest.description ? (
-              <p className="whitespace-pre-wrap text-sm text-foreground">
-                {quest.description}
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground/60">
-                No description added yet.
-              </p>
-            )}
+            <InlineEditDescription
+              value={quest.description}
+              onSave={(description) => onUpdate({ id: quest.id, description })}
+              readOnly={!canManage}
+            />
           </DetailField>
 
           <div className="grid grid-cols-2 gap-4">

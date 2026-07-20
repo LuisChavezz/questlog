@@ -111,7 +111,7 @@ export function InlineEditTitle({
       )}
       aria-label={`Edit title: ${value}`}
     >
-      <span className="truncate font-medium text-foreground">{value}</span>
+      <span className="min-w-0 truncate font-medium text-foreground">{value}</span>
       <Pencil
         className="size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-40"
         aria-hidden="true"

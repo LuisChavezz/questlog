@@ -34,6 +34,9 @@ export function useUpdateQuest(queryKey: QueryKey = ['quests']) {
           return {
             ...quest,
             ...(variables.title !== undefined && { title: variables.title }),
+            ...(variables.description !== undefined && {
+              description: variables.description.trim() || null,
+            }),
             ...(variables.status !== undefined && {
               status: variables.status,
               completedAt: variables.status === 'done' ? new Date() : null,
