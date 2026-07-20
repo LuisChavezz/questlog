@@ -114,11 +114,17 @@ export const updateGuildMemberRoleSchema = z.object({
   newRole: assignableGuildRoleSchema,
 })
 
+export type UpdateGuildMemberRoleValues = z.infer<
+  typeof updateGuildMemberRoleSchema
+>
+
 /** Esquema de entrada para expulsar a un miembro de un guild */
 export const removeGuildMemberSchema = z.object({
   slug: guildSlugSchema,
   userId: z.string().min(1),
 })
+
+export type RemoveGuildMemberValues = z.infer<typeof removeGuildMemberSchema>
 
 /** Esquema de entrada para transferir la propiedad de un guild a otro miembro */
 export const transferGuildOwnershipSchema = z.object({
@@ -126,7 +132,13 @@ export const transferGuildOwnershipSchema = z.object({
   newOwnerUserId: z.string().min(1),
 })
 
+export type TransferGuildOwnershipValues = z.infer<
+  typeof transferGuildOwnershipSchema
+>
+
 /** Esquema de entrada para abandonar un guild voluntariamente */
 export const leaveGuildSchema = z.object({
   slug: guildSlugSchema,
 })
+
+export type LeaveGuildValues = z.infer<typeof leaveGuildSchema>

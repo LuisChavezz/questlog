@@ -5,7 +5,7 @@
 import { Suspense } from 'react'
 
 import { DataTable } from '#/components/ui/data-table'
-import { questsColumns } from './quests-columns'
+import { QUEST_TABLE_STICKY_LEADING_COLUMN_IDS, questsColumns } from './quests-columns'
 import { QuestsTable } from './quests-table'
 
 function QuestsTableSkeleton() {
@@ -15,6 +15,7 @@ function QuestsTableSkeleton() {
       data={[]}
       isLoading
       defaultPageSize={10}
+      stickyLeadingColumnIds={QUEST_TABLE_STICKY_LEADING_COLUMN_IDS}
     />
   )
 }

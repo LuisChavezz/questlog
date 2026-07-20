@@ -61,10 +61,14 @@ type PermissionTarget = { userId: string; role: GuildRole }
 /**
  * ¿Puede el observador cambiar el rol del miembro objetivo?
  * Solo el owner puede, y nunca sobre el propio owner (su rol es estructural).
+ * Solo depende de `ownerId`/`viewerId`/`target.userId` (nunca de los roles), así
+ * que el parámetro se tipa con lo mínimo que usa — los servidores que llaman a
+ * este predicado no tienen por qué resolver el rol de nadie solo para satisfacer
+ * el tipo.
  */
 export function canChangeMemberRole(
-  viewer: GuildMemberViewer,
-  target: PermissionTarget,
+  viewer: Pick<GuildMemberViewer, 'viewerId' | 'ownerId'>,
+  target: Pick<PermissionTarget, 'userId'>,
 ): boolean {
   return (
     isGuildOwner(viewer.ownerId, viewer.viewerId) &&

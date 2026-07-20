@@ -28,10 +28,12 @@ import { useUpdateQuest } from '../hooks/use-update-quest'
 import {
   createQuestsColumns,
   PRIORITY_OPTIONS,
+  QUEST_TABLE_STICKY_LEADING_COLUMN_IDS,
   STATUS_OPTIONS,
 } from './quests-columns'
 import type { MemberOption } from './member-select'
 import { CreateQuestDialog } from './create-quest-dialog'
+import { QuestDetailsDrawer } from './quest-details-drawer'
 
 // Estado de la eliminación pendiente de confirmación en el diálogo
 interface PendingDeletion {
@@ -120,6 +122,14 @@ export function QuestsTableContent({
     useState<PendingDeletion | null>(null)
   const pendingCount = pendingDeletion?.ids.length ?? 0
 
+  // Id de la quest cuyo drawer de detalle está abierto (null = cerrado). Se
+  // guarda solo el id —no la quest completa— para que el contenido del drawer
+  // siempre lea el objeto vigente de `quests` (incluye ediciones optimistas)
+  // en vez de quedarse con una copia obsoleta tomada al abrir.
+  const [detailsQuestId, setDetailsQuestId] = useState<string | null>(null)
+  const detailsQuest =
+    quests.find((quest) => quest.id === detailsQuestId) ?? null
+
   // Ejecuta la eliminación: usa el endpoint individual para una sola quest
   // y el masivo para varias, luego limpia la selección de la tabla
   const confirmDeletion = async () => {
@@ -179,20 +189,25 @@ export function QuestsTableContent({
     }
   }, [guildMembers, guildCurrentUserId, guildCurrentUserRole, guildOwnerId])
 
+  const columnsGuildContext = useMemo(
+    () =>
+      guildMembers && guildAuth
+        ? {
+            members: guildMembers,
+            onAssignmentChange: updateAssignment,
+            canManageQuest: guildAuth.canManageQuest,
+            canUpdateQuestStatus: guildAuth.canUpdateQuestStatus,
+          }
+        : undefined,
+    [guildMembers, guildAuth, updateAssignment],
+  )
+
   const columns = useMemo(
     () =>
-      createQuestsColumns(
-        updateQuest,
-        guildMembers && guildAuth
-          ? {
-              members: guildMembers,
-              onAssignmentChange: updateAssignment,
-              canManageQuest: guildAuth.canManageQuest,
-              canUpdateQuestStatus: guildAuth.canUpdateQuestStatus,
-            }
-          : undefined,
+      createQuestsColumns(updateQuest, columnsGuildContext, (quest) =>
+        setDetailsQuestId(quest.id),
       ),
-    [updateQuest, updateAssignment, guildMembers, guildAuth],
+    [updateQuest, columnsGuildContext],
   )
 
   // Solo se pueden seleccionar (para acciones masivas) las quests gestionables.
@@ -277,6 +292,7 @@ export function QuestsTableContent({
         filterPlaceholder="Search quests..."
         defaultPageSize={10}
         actions={actions}
+        stickyLeadingColumnIds={QUEST_TABLE_STICKY_LEADING_COLUMN_IDS}
       />
 
       <ConfirmDialog
@@ -294,6 +310,15 @@ export function QuestsTableContent({
         confirmLabel="Delete"
         cancelLabel="Cancel"
         onConfirm={confirmDeletion}
+      />
+
+      <QuestDetailsDrawer
+        quest={detailsQuest}
+        onOpenChange={(open) => {
+          if (!open) setDetailsQuestId(null)
+        }}
+        onUpdate={updateQuest}
+        guildContext={columnsGuildContext}
       />
     </>
   )

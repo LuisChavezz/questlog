@@ -19,6 +19,7 @@ import {
   Eye,
   Flag,
   MinusCircle,
+  PanelRightOpen,
   ScrollText,
   Tag,
   UserRound,
@@ -26,7 +27,9 @@ import {
 } from 'lucide-react'
 
 import { ColumnHeader } from '#/components/ui/data-table'
+import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
+import { Tooltip } from '#/components/ui/tooltip'
 import { dateFormatter } from '#/lib/format-date'
 
 import type { Quest, QuestPriority, QuestStatus } from '#/db/schema'
@@ -38,6 +41,20 @@ import { InlineEditDueDate } from './inline-edit-due-date'
 import { InlineEditTags } from './inline-edit-tags'
 import type { MemberOption } from './member-select'
 import { MemberDisplay, MemberSelect } from './member-select'
+
+// Marca cada trigger "Open" de fila para que el drawer de detalle (no modal)
+// pueda distinguir "clic en OTRO trigger de fila" de un clic realmente externo
+// en su propio `onPointerDownOutside` — así evita cerrarse y reabrirse al
+// cambiar de quest en vez de intercambiar el contenido en el sitio.
+export const QUEST_OPEN_TRIGGER_ATTR = 'data-quest-open-trigger'
+
+// IDs de columna que se fijan al borde izquierdo (checkbox + título) para que
+// la identidad de la fila siga visible durante el scroll horizontal —
+// `DataTable` es genérico y no asume esto por sí solo, así que cada tabla de
+// quests (personal y de guild) pasa este mismo valor a su prop
+// `stickyLeadingColumnIds`. Una sola constante para las tres pantallas que
+// renderizan la tabla (cargada o su skeleton de Suspense) evita que diverjan.
+export const QUEST_TABLE_STICKY_LEADING_COLUMN_IDS = ['select', 'title'] as const
 
 // ─── Opciones de estado y prioridad ───────────────────────────────────────────
 
@@ -183,24 +200,37 @@ function createAssignmentColumn(
   }
 }
 
+// ─── Permisos ─────────────────────────────────────────────────────────────────
+
+/**
+ * Predicados de permiso para las quests de una tabla — misma fuente que usan
+ * las columnas y el drawer de detalle, así que nunca se desincronizan entre sí.
+ * Sin contexto de guild (vista personal) todo es editable: las quests
+ * personales siempre pertenecen a quien las ve.
+ */
+export function getQuestPermissions(guildContext?: QuestsColumnsGuildContext) {
+  return {
+    canManage: (quest: Quest) =>
+      guildContext ? guildContext.canManageQuest(quest) : true,
+    canEditStatus: (quest: Quest) =>
+      guildContext ? guildContext.canUpdateQuestStatus(quest) : true,
+  }
+}
+
 // ─── Factory de columnas ──────────────────────────────────────────────────────
 
 /**
  * Crea las definiciones de columnas para la tabla de quests.
  * @param onUpdate - Callback invocado cuando el usuario confirma una edición inline.
  * @param guildContext - Si se provee, añade las columnas de asignado/supervisor.
+ * @param onOpenDetails - Callback invocado al hacer clic en el trigger de detalle de una fila.
  */
 export function createQuestsColumns(
   onUpdate: (data: UpdateQuestValues) => void,
   guildContext?: QuestsColumnsGuildContext,
+  onOpenDetails?: (quest: Quest) => void,
 ): ColumnDef<Quest>[] {
-  // Sin contexto de guild (vista personal) todo es editable: las quests
-  // personales siempre pertenecen a quien las ve. Con contexto, mandan los
-  // predicados de permiso.
-  const canManage = (quest: Quest) =>
-    guildContext ? guildContext.canManageQuest(quest) : true
-  const canEditStatus = (quest: Quest) =>
-    guildContext ? guildContext.canUpdateQuestStatus(quest) : true
+  const { canManage, canEditStatus } = getQuestPermissions(guildContext)
 
   return [
     {
@@ -238,26 +268,44 @@ export function createQuestsColumns(
         ) : null,
     },
 
-    // Title + description (título editable inline)
+    // Title (editable inline, una sola línea — la descripción completa solo
+    // vive en el drawer de detalle, no en la tabla). El trigger del drawer
+    // vive dentro de esta misma celda, tras el título — estilo Notion
+    // ("ABRIR" en el hover de fila) — en vez de una columna dedicada. Ocupa un
+    // slot de ancho fijo (shrink-0) siempre presente en el layout para que el
+    // truncado del título no salte al aparecer/desaparecer con el hover.
     {
       accessorKey: 'title',
       header: () => <ColumnHeader icon={ScrollText}>Quest</ColumnHeader>,
-      size: 320,
+      size: 256,
       minSize: 220,
       cell: ({ row }) => {
-        const { id, title, description } = row.original
+        const quest = row.original
+        const { id, title } = quest
         return (
-          <div className="flex flex-col gap-0.5 min-w-0">
+          <div className="flex min-w-0 items-center gap-1">
             <InlineEditTitle
               value={title}
               onSave={(newTitle) => onUpdate({ id, title: newTitle })}
-              readOnly={!canManage(row.original)}
+              readOnly={!canManage(quest)}
+              className="min-w-0 flex-1"
             />
-            {description && (
-              <span className="text-xs text-muted-foreground line-clamp-1 max-w-xs pl-1.5">
-                {description}
-              </span>
-            )}
+            <Tooltip content="Open" side="top">
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon-sm"
+                aria-label={`Open details: ${title}`}
+                {...{ [QUEST_OPEN_TRIGGER_ATTR]: 'true' }}
+                className="shrink-0 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 focus-visible:opacity-100"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onOpenDetails?.(quest)
+                }}
+              >
+                <PanelRightOpen className="size-4" aria-hidden="true" />
+              </Button>
+            </Tooltip>
           </div>
         )
       },

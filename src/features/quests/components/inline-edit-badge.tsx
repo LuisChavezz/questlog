@@ -58,7 +58,7 @@ export function InlineEditBadge({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1"
+          className="rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1"
           aria-label={`Change ${label}: ${current.label}`}
         >
           <Badge

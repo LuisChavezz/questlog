@@ -36,7 +36,10 @@ import type {
   DataTableSelectionBoundaryProps,
 } from '#/components/ui/data-table-bulk-actions'
 import { DataTablePagination } from '#/components/ui/data-table-pagination'
-import { DataTableSkeleton } from '#/components/ui/data-table-skeleton'
+import {
+  DataTableSkeleton,
+  STICKY_LEADING_BORDER_CLASS,
+} from '#/components/ui/data-table-skeleton'
 import { DataTableToolbar } from '#/components/ui/data-table-toolbar'
 import { cn } from '#/lib/utils'
 
@@ -60,7 +63,20 @@ interface DataTableProps<TData extends RowData, TValue> {
   bulkActions?: DataTableBulkAction<TData>[]
   /** Slot derecho de la toolbar: acciones como botones de creación, filtros, etc. */
   actions?: React.ReactNode
+  /**
+   * IDs de columna que se fijan (`position: sticky`) al borde izquierdo, EN
+   * ORDEN de aparición, para que la identidad de la fila siga visible durante
+   * el scroll horizontal. Vacío por defecto: `DataTable` es genérico y no
+   * asume ninguna columna en particular — cada caller decide cuáles fijar
+   * (y con qué IDs) según sus propias columnas.
+   */
+  stickyLeadingColumnIds?: readonly string[]
 }
+
+// Referencia estable para el default de `stickyLeadingColumnIds`: un array
+// literal `[]` en la firma de la función se recrea en cada render, lo que
+// invalidaría el useMemo de los offsets en cada render aunque nada cambie.
+const NO_STICKY_LEADING_COLUMN_IDS: readonly string[] = []
 
 interface PersistedColumnSizing {
   columnSizing: ColumnSizingState
@@ -70,6 +86,14 @@ interface HeaderCellProps<TData extends RowData> {
   header: Header<TData, unknown>
   table: Table<TData>
   selectionBoundaryProps?: DataTableSelectionBoundaryProps
+}
+
+// Props de columnas fijas — separadas de `HeaderCellProps` porque solo las
+// necesita `DataTableHeaderCell`, no `HeaderCellInner` ni `ColumnResizeHandle`.
+interface StickyLeadingCellProps {
+  stickyLeadingColumnIds: readonly string[]
+  stickyLeadingOffsets: Readonly<Record<string, number>>
+  isLastStickyLeadingColumn: boolean
 }
 
 export function DataTable<TData extends RowData, TValue>({
@@ -86,6 +110,7 @@ export function DataTable<TData extends RowData, TValue>({
   enableRowSelection = true,
   bulkActions = [],
   actions,
+  stickyLeadingColumnIds = NO_STICKY_LEADING_COLUMN_IDS,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -183,6 +208,24 @@ export function DataTable<TData extends RowData, TValue>({
 
   const visibleColumnCount = Math.max(table.getVisibleLeafColumns().length, 1)
   const tableWidth = Math.max(table.getTotalSize(), 0)
+  // Offset izquierdo (px) de cada columna fija, derivado del ancho REAL de las
+  // columnas fijas que la preceden (`table.getColumn(id).getSize()`, que ya
+  // incorpora `columnSizing` y el `size` del columnDef) — no un valor
+  // hardcodeado, así que sigue siendo correcto si una columna fija se
+  // redimensiona o si el caller configura otras columnas/anchos.
+  const stickyLeadingOffsets = React.useMemo(() => {
+    const offsets: Record<string, number> = {}
+    let cumulativeWidth = 0
+
+    for (const columnId of stickyLeadingColumnIds) {
+      offsets[columnId] = cumulativeWidth
+      cumulativeWidth += table.getColumn(columnId)?.getSize() ?? 0
+    }
+
+    return offsets
+  }, [stickyLeadingColumnIds, table])
+  const lastStickyLeadingColumnId =
+    stickyLeadingColumnIds[stickyLeadingColumnIds.length - 1]
   const isResizing = Boolean(table.getState().columnSizingInfo.isResizingColumn)
   const selectedRows = table.getSelectedRowModel().rows
   const selectedCount = selectedRows.length
@@ -269,6 +312,11 @@ export function DataTable<TData extends RowData, TValue>({
                       header={header}
                       table={table}
                       selectionBoundaryProps={selectionBoundaryProps}
+                      stickyLeadingColumnIds={stickyLeadingColumnIds}
+                      stickyLeadingOffsets={stickyLeadingOffsets}
+                      isLastStickyLeadingColumn={
+                        header.column.id === lastStickyLeadingColumnId
+                      }
                     />
                   ))}
                 </tr>
@@ -280,6 +328,9 @@ export function DataTable<TData extends RowData, TValue>({
                 <DataTableSkeleton
                   columns={visibleColumnCount}
                   rows={defaultPageSize}
+                  stickyLeadingOffsets={stickyLeadingColumnIds.map(
+                    (columnId) => stickyLeadingOffsets[columnId],
+                  )}
                 />
               ) : table.getRowModel().rows.length ? (
                 table.getRowModel().rows.map((row) => (
@@ -288,28 +339,59 @@ export function DataTable<TData extends RowData, TValue>({
                     data-state={row.getIsSelected() ? 'selected' : undefined}
                     className="group/row border-b border-border transition-colors last:border-0 hover:bg-muted/30 data-[state=selected]:bg-primary/5"
                   >
-                    {row.getVisibleCells().map((cell) => (
-                      <td
-                        key={cell.id}
-                        className={cn(
-                          'py-3 align-middle',
-                          cell.column.id === 'select' ? 'px-3 text-center' : 'px-4',
-                        )}
-                        style={{ width: cell.column.getSize() }}
-                      >
-                        {isSelectionColumn(cell.column.id) ? (
-                          <SelectionVisibilityContainer
-                            isVisible={row.getIsSelected()}
-                            boundaryProps={selectionBoundaryProps}
-                            revealOnHoverClassName="group-hover/row:opacity-100 group-hover/row:pointer-events-auto"
-                          >
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </SelectionVisibilityContainer>
-                        ) : (
-                          flexRender(cell.column.columnDef.cell, cell.getContext())
-                        )}
-                      </td>
-                    ))}
+                    {row.getVisibleCells().map((cell) => {
+                      const isSticky = stickyLeadingColumnIds.includes(cell.column.id)
+
+                      return (
+                        <td
+                          key={cell.id}
+                          className={cn(
+                            'py-3 align-middle',
+                            cell.column.id === 'select' ? 'px-3 text-center' : 'px-4',
+                            // `bg-card`/hover/selected fijan el MISMO `background-color`:
+                            // no se "apilan" — la que gane por especificidad
+                            // reemplaza a las demás por completo. Con
+                            // `bg-muted/30` (alfa parcial, mezclado con
+                            // transparent) el hover REEMPLAZABA el fondo
+                            // opaco por uno ~70% transparente, dejando ver el
+                            // contenido scrolleado detrás — invisible sin
+                            // scroll (nada distinto detrás todavía), visible
+                            // en cuanto hay contenido de otra columna físicamente
+                            // debajo. Se usan colores ya opacos (`color-mix`
+                            // contra `--color-card`, mismo espacio `oklab` que
+                            // genera Tailwind) para que el tinte de hover/selección
+                            // siga leyéndose igual mientras el fondo se mantiene
+                            // opaco en los tres estados.
+                            isSticky &&
+                              cn(
+                                'sticky z-10 bg-card',
+                                'group-hover/row:bg-[color-mix(in_oklab,var(--color-muted)_30%,var(--color-card))]',
+                                'group-data-[state=selected]/row:bg-[color-mix(in_oklab,var(--color-primary)_5%,var(--color-card))]',
+                              ),
+                            cell.column.id === lastStickyLeadingColumnId &&
+                              STICKY_LEADING_BORDER_CLASS,
+                          )}
+                          style={{
+                            width: cell.column.getSize(),
+                            ...(isSticky
+                              ? { left: stickyLeadingOffsets[cell.column.id] }
+                              : undefined),
+                          }}
+                        >
+                          {isSelectionColumn(cell.column.id) ? (
+                            <SelectionVisibilityContainer
+                              isVisible={row.getIsSelected()}
+                              boundaryProps={selectionBoundaryProps}
+                              revealOnHoverClassName="group-hover/row:opacity-100 group-hover/row:pointer-events-auto"
+                            >
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </SelectionVisibilityContainer>
+                          ) : (
+                            flexRender(cell.column.columnDef.cell, cell.getContext())
+                          )}
+                        </td>
+                      )
+                    })}
                   </tr>
                 ))
               ) : (
@@ -353,11 +435,20 @@ function DataTableHeaderCell<TData extends RowData>({
   header,
   table,
   selectionBoundaryProps,
-}: HeaderCellProps<TData>) {
+  stickyLeadingColumnIds,
+  stickyLeadingOffsets,
+  isLastStickyLeadingColumn,
+}: HeaderCellProps<TData> & StickyLeadingCellProps) {
+  const columnId = header.column.id
+  const isSticky = stickyLeadingColumnIds.includes(columnId)
+
   return (
     <th
-      className={getHeaderCellClassName(header.column.id)}
-      style={{ width: header.getSize() }}
+      className={getHeaderCellClassName(columnId, isSticky, isLastStickyLeadingColumn)}
+      style={{
+        width: header.getSize(),
+        ...(isSticky ? { left: stickyLeadingOffsets[columnId] } : undefined),
+      }}
     >
       <HeaderCellInner
         header={header}
@@ -537,14 +628,33 @@ function SortableHeader({
   )
 }
 
-function getHeaderCellClassName(columnId: string) {
+function getHeaderCellClassName(
+  columnId: string,
+  isSticky: boolean,
+  isLastStickyLeadingColumn: boolean,
+) {
   return cn(
-    'relative py-3 align-middle font-medium text-muted-foreground whitespace-nowrap',
+    'py-3 align-middle font-medium text-muted-foreground whitespace-nowrap',
+    // `sticky` y `relative` son mutuamente excluyentes en `position` — el
+    // contexto de posicionamiento del resize handle vive en el div interno
+    // de HeaderCellInner (que ya trae su propio `relative`), así que aquí no
+    // hace falta combinarlos.
+    // `bg-muted` (opaco), no `bg-muted/40`: la fila del thead usa /40 porque
+    // se ve sobre el fondo estático del contenedor, pero estas celdas fijas
+    // (`sticky`) van sobre encabezados que siguen desplazándose por debajo —
+    // con alfa parcial ese texto se transparenta a través. Mismo criterio que
+    // ya usa `bg-card` (opaco) en las celdas del body.
+    isSticky ? 'sticky z-10 bg-muted' : 'relative',
     isSelectionColumn(columnId) && 'group/select-header',
     columnId === 'select' ? 'px-3 text-center' : 'px-4 text-left',
+    isLastStickyLeadingColumn && STICKY_LEADING_BORDER_CLASS,
   )
 }
 
+// El id `'select'` es una convención propia de `DataTable` (no de la columna
+// que el caller define): controla el centrado del checkbox y su afordancia de
+// aparición al hover — comportamiento ORTOGONAL a qué columnas quedan fijas,
+// que ahora configura el caller vía `stickyLeadingColumnIds`.
 function isSelectionColumn(columnId: string) {
   return columnId === 'select'
 }

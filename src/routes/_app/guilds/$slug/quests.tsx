@@ -9,7 +9,10 @@ import {
   guildQuestsQueryOptions,
 } from '#/features/guilds/api/guild-query-options'
 import { canCreateGuildQuest } from '#/features/guilds/role-labels'
-import { guildQuestsColumns } from '#/features/quests/components/quests-columns'
+import {
+  guildQuestsColumns,
+  QUEST_TABLE_STICKY_LEADING_COLUMN_IDS,
+} from '#/features/quests/components/quests-columns'
 import { QuestsTableContent } from '#/features/quests/components/quests-table'
 
 export const Route = createFileRoute('/_app/guilds/$slug/quests')({
@@ -81,6 +84,7 @@ function GuildQuestsPage() {
             data={[]}
             isLoading
             defaultPageSize={10}
+            stickyLeadingColumnIds={QUEST_TABLE_STICKY_LEADING_COLUMN_IDS}
           />
         }
       >

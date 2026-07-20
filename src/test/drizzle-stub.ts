@@ -13,21 +13,42 @@
 // módulo), encolar resultados con enqueue*, y limpiar en afterEach con
 // resetDbStub. `transaction` ejecuta el callback pasándole el propio stub como
 // `tx`, de modo que las lecturas bloqueadas comparten las mismas colas.
+//
+// Además registra cada operación (ver `DbCall` / `getDbCalls`), para poder
+// afirmar sobre escrituras que no se reflejan en el valor de retorno del
+// handler — p. ej. la limpieza en cascada de un borrado— o sobre el hecho de
+// que una relectura se hizo con bloqueo.
 
 type Row = Record<string, unknown>
+
+// Registro de una operación ejecutada contra el stub. Permite afirmar sobre lo
+// que el handler ESCRIBIÓ (tabla y payload de `.set`) y sobre cómo lo leyó
+// (`.for('update')` = relectura bloqueada, `.returning()` = confirmación de
+// filas afectadas) — evidencia que el valor de retorno por sí solo no da, y que
+// hace falta para cubrir rutas como la limpieza en cascada o la reverificación
+// TOCTOU dentro de la transacción.
+export interface DbCall {
+  op: 'select' | 'update' | 'insert' | 'delete'
+  // Tabla objetivo: el argumento de update/insert/delete, o el de `.from()` en
+  // un select (que recibe la proyección, no la tabla, en su primera llamada).
+  table: unknown
+  set?: Row
+  locked: boolean
+  returning: boolean
+}
 
 // Cadena encadenable y "thenable". Los tipos son explícitos (interfaces con
 // nombre) para romper la auto-referencia de `transaction` sobre `typeof dbStub`.
 interface Chain {
-  from: () => Chain
-  where: () => Chain
-  limit: () => Chain
-  for: () => Chain
-  set: () => Chain
-  values: () => Chain
-  returning: () => Chain
-  orderBy: () => Chain
-  innerJoin: () => Chain
+  from: (table?: unknown) => Chain
+  where: (condition?: unknown) => Chain
+  limit: (count?: number) => Chain
+  for: (strength?: string) => Chain
+  set: (values?: Row) => Chain
+  values: (rows?: unknown) => Chain
+  returning: (projection?: unknown) => Chain
+  orderBy: (order?: unknown) => Chain
+  innerJoin: (table?: unknown, on?: unknown) => Chain
   then: (
     onF: (v: Row[]) => unknown,
     onR?: (e: unknown) => unknown,
@@ -35,10 +56,10 @@ interface Chain {
 }
 
 interface DbStub {
-  select: () => Chain
-  update: () => Chain
-  insert: () => Chain
-  delete: () => Chain
+  select: (projection?: unknown) => Chain
+  update: (table?: unknown) => Chain
+  insert: (table?: unknown) => Chain
+  delete: (table?: unknown) => Chain
   transaction: <T>(cb: (tx: DbStub) => Promise<T>) => Promise<T>
 }
 
@@ -49,15 +70,31 @@ const queues = {
   delete: [] as Row[][],
 }
 
-function makeChain(resolve: () => Row[]): Chain {
+// Orden real de ejecución de las operaciones, compartido por db y tx (la
+// transacción reusa el mismo stub), así que refleja también lo escrito dentro.
+const calls: DbCall[] = []
+
+function makeChain(call: DbCall, resolve: () => Row[]): Chain {
   const chain: Chain = {
-    from: () => chain,
+    from: (table) => {
+      call.table = table
+      return chain
+    },
     where: () => chain,
     limit: () => chain,
-    for: () => chain,
-    set: () => chain,
+    for: () => {
+      call.locked = true
+      return chain
+    },
+    set: (values) => {
+      call.set = values
+      return chain
+    },
     values: () => chain,
-    returning: () => chain,
+    returning: () => {
+      call.returning = true
+      return chain
+    },
     orderBy: () => chain,
     innerJoin: () => chain,
     then: (onF, onR) => Promise.resolve(resolve()).then(onF, onR),
@@ -65,12 +102,29 @@ function makeChain(resolve: () => Row[]): Chain {
   return chain
 }
 
+// Registra la operación en el momento en que se abre la cadena, de modo que
+// `calls` conserve el orden de ejecución; los métodos posteriores la completan.
+function startCall(op: DbCall['op'], table: unknown, resolve: () => Row[]) {
+  const call: DbCall = { op, table, locked: false, returning: false }
+  calls.push(call)
+  return makeChain(call, resolve)
+}
+
 export const dbStub: DbStub = {
-  select: () => makeChain(() => queues.select.shift() ?? []),
-  update: () => makeChain(() => queues.update.shift() ?? []),
-  insert: () => makeChain(() => queues.insert.shift() ?? []),
-  delete: () => makeChain(() => queues.delete.shift() ?? []),
+  select: () =>
+    startCall('select', undefined, () => queues.select.shift() ?? []),
+  update: (table) =>
+    startCall('update', table, () => queues.update.shift() ?? []),
+  insert: (table) =>
+    startCall('insert', table, () => queues.insert.shift() ?? []),
+  delete: (table) =>
+    startCall('delete', table, () => queues.delete.shift() ?? []),
   transaction: (cb) => cb(dbStub),
+}
+
+// Operaciones ejecutadas desde el último reset, en orden.
+export function getDbCalls(): readonly DbCall[] {
+  return calls
 }
 
 export function enqueueSelect(rows: Row[]) {
@@ -94,4 +148,5 @@ export function resetDbStub() {
   queues.update.length = 0
   queues.insert.length = 0
   queues.delete.length = 0
+  calls.length = 0
 }
