@@ -4,7 +4,7 @@
  * actualización y devuelve las columnas con soporte de edición inline.
  * También exporta questsColumns como instancia estática para el skeleton.
  */
-import type { ColumnDef } from '@tanstack/react-table'
+import type { ColumnDef, Row } from '@tanstack/react-table'
 import type { LucideIcon } from 'lucide-react'
 import {
   Activity,
@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 
 import { ColumnHeader } from '#/components/ui/data-table'
+import type { DataTableFilterDef } from '#/components/ui/data-table-filter'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { Tooltip } from '#/components/ui/tooltip'
@@ -40,7 +41,12 @@ import { InlineEditBadge } from './inline-edit-badge'
 import { InlineEditDueDate } from './inline-edit-due-date'
 import { InlineEditTags } from './inline-edit-tags'
 import type { MemberOption } from './member-select'
-import { MemberDisplay, MemberSelect } from './member-select'
+import {
+  MemberAvatarOrPlaceholder,
+  MemberDisplay,
+  MemberSelect,
+  UNASSIGNED_VALUE,
+} from './member-select'
 
 // Marca cada trigger "Open" de fila para que el drawer de detalle (no modal)
 // pueda distinguir "clic en OTRO trigger de fila" de un clic realmente externo
@@ -54,7 +60,32 @@ export const QUEST_OPEN_TRIGGER_ATTR = 'data-quest-open-trigger'
 // quests (personal y de guild) pasa este mismo valor a su prop
 // `stickyLeadingColumnIds`. Una sola constante para las tres pantallas que
 // renderizan la tabla (cargada o su skeleton de Suspense) evita que diverjan.
-export const QUEST_TABLE_STICKY_LEADING_COLUMN_IDS = ['select', 'title'] as const
+export const QUEST_TABLE_STICKY_LEADING_COLUMN_IDS = [
+  'select',
+  'title',
+] as const
+
+// ─── Filtrado multi-select ─────────────────────────────────────────────────────
+
+// Predicado compartido por todas las columnas con filtro multi-select: sin
+// selección (`[]`, chip recién creado o vaciado) no filtra nada; con
+// selección, solo pasan las filas cuyo valor esté incluido.
+function matchesMultiSelectFilter(filterValue: string[], value: string) {
+  return filterValue.length === 0 || filterValue.includes(value)
+}
+
+// `filterFn` reutilizable para columnas cuyo valor filtrable ES el que ya
+// expone `row.getValue(columnId)` (Status, Priority) — no sirve para
+// Assignee/Supervisor, que comparan contra `row.original[field] ??
+// UNASSIGNED_VALUE` en vez del valor que ya normalizó el accessor (ver
+// `createAssignmentColumn`, que arma su propio `filterFn` con ese matiz).
+function multiSelectFilterFn(
+  row: Row<Quest>,
+  columnId: string,
+  filterValue: string[],
+) {
+  return matchesMultiSelectFilter(filterValue, row.getValue(columnId))
+}
 
 // ─── Opciones de estado y prioridad ───────────────────────────────────────────
 
@@ -87,6 +118,75 @@ export const PRIORITY_OPTIONS: readonly BadgeOption[] = [
     variant: 'critical',
   },
 ] as const
+
+// Filtros de columnas con opciones fijas (enum), disponibles siempre. Mismo
+// orden que las columnas de la tabla. Assignee/Supervisor (opciones dinámicas:
+// miembros del guild) NO viven aquí — ver `createAssigneeFilterDef` y
+// `createSupervisorFilterDef` — así que el caller que sí tenga contexto de
+// guild los agrega aparte, después de estos dos.
+export const QUEST_FILTERS: readonly DataTableFilterDef[] = [
+  {
+    id: 'status',
+    columnId: 'status',
+    label: 'Status',
+    options: STATUS_OPTIONS,
+  },
+  {
+    id: 'priority',
+    columnId: 'priority',
+    label: 'Priority',
+    options: PRIORITY_OPTIONS,
+  },
+]
+
+// Filtro de asignación (Assignee o Supervisor): sus opciones son los miembros
+// reales del guild (más "Unassigned" para quests sin asignar), no un enum
+// fijo — por eso se arma en runtime a partir de la lista de miembros ya
+// disponible (la misma que usan las celdas de Assignee/Supervisor) en vez de
+// vivir en `QUEST_FILTERS`. Solo aplica en la tabla de un guild: la vista
+// personal no tiene miembros que ofrecer, así que su caller simplemente omite
+// estas entradas ahí. Compartida por `createAssigneeFilterDef` y
+// `createSupervisorFilterDef` — misma forma para ambos campos de asignación,
+// igual que `createAssignmentColumn` comparte una sola implementación
+// parametrizada por `field` para las columnas de la tabla.
+function createMemberFilterDef(
+  field: 'assigneeId' | 'supervisorId',
+  label: string,
+  members: readonly MemberOption[],
+): DataTableFilterDef {
+  return {
+    id: field,
+    columnId: field,
+    label,
+    options: [
+      {
+        value: UNASSIGNED_VALUE,
+        label: 'Unassigned',
+        icon: () => <MemberAvatarOrPlaceholder member={null} size="xs" />,
+      },
+      ...members.map((member, index) => ({
+        value: member.userId,
+        label: member.name ?? 'Unknown member',
+        icon: () => <MemberAvatarOrPlaceholder member={member} size="xs" />,
+        // Separador antes del primer miembro real: distingue visualmente el
+        // grupo "Unassigned" del listado de miembros que le sigue.
+        separatorBefore: index === 0,
+      })),
+    ],
+  }
+}
+
+export function createAssigneeFilterDef(
+  members: readonly MemberOption[],
+): DataTableFilterDef {
+  return createMemberFilterDef('assigneeId', 'Assignee', members)
+}
+
+export function createSupervisorFilterDef(
+  members: readonly MemberOption[],
+): DataTableFilterDef {
+  return createMemberFilterDef('supervisorId', 'Supervisor', members)
+}
 
 // ─── Contexto de guild ────────────────────────────────────────────────────────
 
@@ -197,6 +297,14 @@ function createAssignmentColumn(
         />
       )
     },
+    // `row.original[field]` (no `getValue`, que pasa por el accessor de arriba
+    // y ya convirtió `null` en `undefined`) para comparar contra el centinela
+    // de "sin asignar" con el mismo criterio que usa `MemberSelect`.
+    filterFn: (row, _columnId, filterValue: string[]) =>
+      matchesMultiSelectFilter(
+        filterValue,
+        row.original[field] ?? UNASSIGNED_VALUE,
+      ),
   }
 }
 
@@ -331,9 +439,7 @@ export function createQuestsColumns(
           />
         )
       },
-      filterFn: (row, _columnId, filterValue: string[]) =>
-        filterValue.length === 0 ||
-        filterValue.includes(row.getValue('status')),
+      filterFn: multiSelectFilterFn,
     },
 
     // Priority (badge editable inline)
@@ -356,6 +462,7 @@ export function createQuestsColumns(
           />
         )
       },
+      filterFn: multiSelectFilterFn,
     },
 
     // Assignee y Supervisor — solo presentes cuando la tabla vive en un guild

@@ -13,6 +13,7 @@ import { Button } from '#/components/ui/button'
 import { ConfirmDialog } from '#/components/ui/confirm-dialog'
 import { DataTable } from '#/components/ui/data-table'
 import type { DataTableBulkAction } from '#/components/ui/data-table-bulk-actions'
+import { DataTableFilterBar } from '#/components/ui/data-table-filter'
 import type { Quest, QuestPriority, QuestStatus, GuildRole } from '#/db/schema'
 import {
   canManageGuildQuest,
@@ -26,8 +27,11 @@ import { useBulkUpdateQuests } from '../hooks/use-bulk-update-quests'
 import { useDeleteQuest } from '../hooks/use-delete-quest'
 import { useUpdateQuest } from '../hooks/use-update-quest'
 import {
+  createAssigneeFilterDef,
   createQuestsColumns,
+  createSupervisorFilterDef,
   PRIORITY_OPTIONS,
+  QUEST_FILTERS,
   QUEST_TABLE_STICKY_LEADING_COLUMN_IDS,
   STATUS_OPTIONS,
 } from './quests-columns'
@@ -210,6 +214,21 @@ export function QuestsTableContent({
     [updateQuest, columnsGuildContext],
   )
 
+  // Assignee solo es filtrable con contexto de guild — sus opciones son los
+  // miembros reales, que la vista personal no tiene. Se agregan después de
+  // Status/Priority, en el mismo orden que las columnas de la tabla.
+  const questFilters = useMemo(
+    () =>
+      guildMembers
+        ? [
+            ...QUEST_FILTERS,
+            createAssigneeFilterDef(guildMembers),
+            createSupervisorFilterDef(guildMembers),
+          ]
+        : QUEST_FILTERS,
+    [guildMembers],
+  )
+
   // Solo se pueden seleccionar (para acciones masivas) las quests gestionables.
   // En la vista personal (sin guildAuth) se seleccionan todas.
   const enableRowSelection = guildAuth
@@ -293,6 +312,19 @@ export function QuestsTableContent({
         defaultPageSize={10}
         actions={actions}
         stickyLeadingColumnIds={QUEST_TABLE_STICKY_LEADING_COLUMN_IDS}
+        // `null` explícito (no delegar en que `DataTableFilterBar` devuelva
+        // `null` internamente) cuando no hay filtros que ofrecer — un
+        // elemento JSX siempre es "truthy" para el toggle/fila colapsable del
+        // toolbar, sin importar en qué termine renderizando el componente.
+        filterPanel={(table, filterPanelOpen) =>
+          questFilters.length === 0 ? null : (
+            <DataTableFilterBar
+              table={table}
+              filters={questFilters}
+              filterPanelOpen={filterPanelOpen}
+            />
+          )
+        }
       />
 
       <ConfirmDialog

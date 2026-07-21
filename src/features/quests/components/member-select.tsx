@@ -33,8 +33,10 @@ export interface MemberOption {
 }
 
 // Radix Select no admite un value de cadena vacía, así que "sin asignar" usa un
-// centinela interno que nunca se expone hacia afuera.
-const UNASSIGNED_VALUE = '__unassigned__'
+// centinela interno que nunca se expone hacia afuera. Exportado porque el
+// filtro de Assignee de la tabla (fuera de este archivo) necesita el mismo
+// valor para representar "sin asignar" dentro de un `string[]` de filtro.
+export const UNASSIGNED_VALUE = '__unassigned__'
 
 interface MemberSelectProps {
   // Id del usuario seleccionado, o null cuando no hay asignación
@@ -73,16 +75,30 @@ function MemberOptionLabel({ member }: { member: MemberOption }) {
 
 // Avatar del miembro asignado, o un ícono de persona genérico si no hay
 // asignación — mismo tamaño que UserAvatar "sm" para que la columna no
-// cambie de ancho/alto entre filas asignadas y sin asignar.
-function MemberAvatarOrPlaceholder({
+// cambie de ancho/alto entre filas asignadas y sin asignar. Exportado: el
+// filtro de Assignee/Supervisor reutiliza este mismo placeholder para su
+// opción "Unassigned" y sus opciones de miembro — con `size="xs"` ahí para
+// igualar el tamaño de los íconos simples (Status/Priority) en la misma
+// lista de checkboxes, en vez de quedar ~1.7x más grande.
+export function MemberAvatarOrPlaceholder({
   member,
+  size = 'sm',
 }: {
   member: MemberOption | null | undefined
+  size?: 'xs' | 'sm'
 }) {
   if (!member) {
     return (
-      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-        <User className="size-3.5" aria-hidden="true" />
+      <span
+        className={cn(
+          'flex shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground',
+          size === 'xs' ? 'size-4' : 'size-6',
+        )}
+      >
+        <User
+          className={size === 'xs' ? 'size-2.5' : 'size-3.5'}
+          aria-hidden="true"
+        />
       </span>
     )
   }
@@ -93,7 +109,7 @@ function MemberAvatarOrPlaceholder({
       image={member.image}
       avatarId={member.avatarId}
       initials={member.initials}
-      size="sm"
+      size={size}
     />
   )
 }

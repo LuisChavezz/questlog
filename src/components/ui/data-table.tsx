@@ -64,6 +64,19 @@ interface DataTableProps<TData extends RowData, TValue> {
   /** Slot derecho de la toolbar: acciones como botones de creación, filtros, etc. */
   actions?: React.ReactNode
   /**
+   * Render prop para la barra de filtros de columna (chips + "Add filter",
+   * debajo de la toolbar). Recibe la instancia de `table` para leer/escribir
+   * `columnFilters` — normalmente vía `DataTableFilterBar` — y si la fila de
+   * filtros está actualmente expandida, para que el caller pueda cerrar sus
+   * propios dropdowns abiertos (de un chip, de "Add filter") cuando el
+   * usuario colapsa la fila con el toggle del toolbar. Omitir la prop deja la
+   * tabla sin esa UI.
+   */
+  filterPanel?: (
+    table: Table<TData>,
+    filterPanelOpen: boolean,
+  ) => React.ReactNode
+  /**
    * IDs de columna que se fijan (`position: sticky`) al borde izquierdo, EN
    * ORDEN de aparición, para que la identidad de la fila siga visible durante
    * el scroll horizontal. Vacío por defecto: `DataTable` es genérico y no
@@ -110,17 +123,29 @@ export function DataTable<TData extends RowData, TValue>({
   enableRowSelection = true,
   bulkActions = [],
   actions,
+  filterPanel,
   stickyLeadingColumnIds = NO_STICKY_LEADING_COLUMN_IDS,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    [],
+  )
   const [globalFilter, setGlobalFilter] = React.useState('')
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
+  // Sin persistencia entre sesiones (a diferencia del ancho de columnas, que
+  // sí se guarda) — siempre arranca colapsada. Vive aquí (no en el toolbar)
+  // porque también decide el `gap` toolbar-tabla de más abajo.
+  const [filterPanelOpen, setFilterPanelOpen] = React.useState(false)
+  const [columnVisibility, setColumnVisibility] =
+    React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({})
   const [columnSizing, setColumnSizing] = React.useState<ColumnSizingState>({})
-  const [isLayoutHydrated, setIsLayoutHydrated] = React.useState(!stateStorageKey)
+  const [isLayoutHydrated, setIsLayoutHydrated] =
+    React.useState(!stateStorageKey)
 
-  const leafColumnIds = React.useMemo(() => getLeafColumnIds(columns), [columns])
+  const leafColumnIds = React.useMemo(
+    () => getLeafColumnIds(columns),
+    [columns],
+  )
   const selectionBoundaryProps = React.useMemo(
     () => getDataTableSelectionBoundaryProps(),
     [],
@@ -154,14 +179,20 @@ export function DataTable<TData extends RowData, TValue>({
     const persistedSizing = readPersistedColumnSizing(stateStorageKey)
 
     if (persistedSizing) {
-      setColumnSizing(normalizeColumnSizing(persistedSizing.columnSizing, leafColumnIds))
+      setColumnSizing(
+        normalizeColumnSizing(persistedSizing.columnSizing, leafColumnIds),
+      )
     }
 
     setIsLayoutHydrated(true)
   }, [leafColumnIds, stateStorageKey])
 
   React.useEffect(() => {
-    if (!stateStorageKey || !isLayoutHydrated || typeof window === 'undefined') {
+    if (
+      !stateStorageKey ||
+      !isLayoutHydrated ||
+      typeof window === 'undefined'
+    ) {
       return
     }
 
@@ -238,15 +269,22 @@ export function DataTable<TData extends RowData, TValue>({
       clearSelection: clearRowSelection,
       selectionBoundaryProps,
     }),
-    [clearRowSelection, selectedCount, selectedRows, selectionBoundaryProps, table],
+    [
+      clearRowSelection,
+      selectedCount,
+      selectedRows,
+      selectionBoundaryProps,
+      table,
+    ],
   )
-  const toolbarLeadingContent = selectedCount > 0 ? (
-    <DataTableBulkActionsBar
-      actions={bulkActions}
-      actionContext={bulkActionContext}
-      className="max-w-full"
-    />
-  ) : undefined
+  const toolbarLeadingContent =
+    selectedCount > 0 ? (
+      <DataTableBulkActionsBar
+        actions={bulkActions}
+        actionContext={bulkActionContext}
+        className="max-w-full"
+      />
+    ) : undefined
 
   React.useEffect(() => {
     if (selectedCount === 0 || typeof document === 'undefined') {
@@ -283,133 +321,155 @@ export function DataTable<TData extends RowData, TValue>({
   }, [clearRowSelection, selectedCount])
 
   return (
-    <div className={cn('flex flex-col gap-4', className)}>
-      <DataTableToolbar
-        table={table}
-        filterPlaceholder={filterPlaceholder}
-        leadingContent={toolbarLeadingContent}
-        actions={actions}
-      />
+    // Envoltorio puramente de passthrough para `className`: sin clases
+    // propias, así el `gap` según `filterPanelOpen` (en el div interno) nunca
+    // comparte grupo de conflicto con lo que el caller pase acá — `twMerge`
+    // solo resuelve conflictos entre clases del MISMO elemento, así que un
+    // `className="gap-2"` externo no puede pisar silenciosamente el toggle.
+    <div className={className}>
+      <div className={cn('flex flex-col', filterPanelOpen ? 'gap-4' : 'gap-0')}>
+        <DataTableToolbar
+          table={table}
+          filterPlaceholder={filterPlaceholder}
+          leadingContent={toolbarLeadingContent}
+          actions={actions}
+          filterPanel={filterPanel?.(table, filterPanelOpen)}
+          filterPanelOpen={filterPanelOpen}
+          onFilterPanelOpenChange={setFilterPanelOpen}
+        />
 
-      <div
-        className="overflow-hidden rounded-xl border border-border bg-card shadow-xs"
-        data-resizing={isResizing ? 'true' : undefined}
-      >
-        <div className="overflow-x-auto data-[resizing=true]:cursor-col-resize data-[resizing=true]:select-none">
-          <table
-            className="min-w-full table-fixed text-sm"
-            style={{ width: tableWidth || undefined }}
-          >
-            <thead>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <tr
-                  key={headerGroup.id}
-                  className="border-b border-border bg-muted/40"
-                >
-                  {headerGroup.headers.map((header) => (
-                    <DataTableHeaderCell
-                      key={header.id}
-                      header={header}
-                      table={table}
-                      selectionBoundaryProps={selectionBoundaryProps}
-                      stickyLeadingColumnIds={stickyLeadingColumnIds}
-                      stickyLeadingOffsets={stickyLeadingOffsets}
-                      isLastStickyLeadingColumn={
-                        header.column.id === lastStickyLeadingColumnId
-                      }
-                    />
-                  ))}
-                </tr>
-              ))}
-            </thead>
-
-            <tbody>
-              {isLoading ? (
-                <DataTableSkeleton
-                  columns={visibleColumnCount}
-                  rows={defaultPageSize}
-                  stickyLeadingOffsets={stickyLeadingColumnIds.map(
-                    (columnId) => stickyLeadingOffsets[columnId],
-                  )}
-                />
-              ) : table.getRowModel().rows.length ? (
-                table.getRowModel().rows.map((row) => (
+        <div
+          className="overflow-hidden rounded-xl border border-border bg-card shadow-xs"
+          data-resizing={isResizing ? 'true' : undefined}
+        >
+          <div className="overflow-x-auto data-[resizing=true]:cursor-col-resize data-[resizing=true]:select-none">
+            <table
+              className="min-w-full table-fixed text-sm"
+              style={{ width: tableWidth || undefined }}
+            >
+              <thead>
+                {table.getHeaderGroups().map((headerGroup) => (
                   <tr
-                    key={row.id}
-                    data-state={row.getIsSelected() ? 'selected' : undefined}
-                    className="group/row border-b border-border transition-colors last:border-0 hover:bg-muted/30 data-[state=selected]:bg-primary/5"
+                    key={headerGroup.id}
+                    className="border-b border-border bg-muted/40"
                   >
-                    {row.getVisibleCells().map((cell) => {
-                      const isSticky = stickyLeadingColumnIds.includes(cell.column.id)
-
-                      return (
-                        <td
-                          key={cell.id}
-                          className={cn(
-                            'py-3 align-middle',
-                            cell.column.id === 'select' ? 'px-3 text-center' : 'px-4',
-                            // `bg-card`/hover/selected fijan el MISMO `background-color`:
-                            // no se "apilan" — la que gane por especificidad
-                            // reemplaza a las demás por completo. Con
-                            // `bg-muted/30` (alfa parcial, mezclado con
-                            // transparent) el hover REEMPLAZABA el fondo
-                            // opaco por uno ~70% transparente, dejando ver el
-                            // contenido scrolleado detrás — invisible sin
-                            // scroll (nada distinto detrás todavía), visible
-                            // en cuanto hay contenido de otra columna físicamente
-                            // debajo. Se usan colores ya opacos (`color-mix`
-                            // contra `--color-card`, mismo espacio `oklab` que
-                            // genera Tailwind) para que el tinte de hover/selección
-                            // siga leyéndose igual mientras el fondo se mantiene
-                            // opaco en los tres estados.
-                            isSticky &&
-                              cn(
-                                'sticky z-10 bg-card',
-                                'group-hover/row:bg-[color-mix(in_oklab,var(--color-muted)_30%,var(--color-card))]',
-                                'group-data-[state=selected]/row:bg-[color-mix(in_oklab,var(--color-primary)_5%,var(--color-card))]',
-                              ),
-                            cell.column.id === lastStickyLeadingColumnId &&
-                              STICKY_LEADING_BORDER_CLASS,
-                          )}
-                          style={{
-                            width: cell.column.getSize(),
-                            ...(isSticky
-                              ? { left: stickyLeadingOffsets[cell.column.id] }
-                              : undefined),
-                          }}
-                        >
-                          {isSelectionColumn(cell.column.id) ? (
-                            <SelectionVisibilityContainer
-                              isVisible={row.getIsSelected()}
-                              boundaryProps={selectionBoundaryProps}
-                              revealOnHoverClassName="group-hover/row:opacity-100 group-hover/row:pointer-events-auto"
-                            >
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </SelectionVisibilityContainer>
-                          ) : (
-                            flexRender(cell.column.columnDef.cell, cell.getContext())
-                          )}
-                        </td>
-                      )
-                    })}
+                    {headerGroup.headers.map((header) => (
+                      <DataTableHeaderCell
+                        key={header.id}
+                        header={header}
+                        table={table}
+                        selectionBoundaryProps={selectionBoundaryProps}
+                        stickyLeadingColumnIds={stickyLeadingColumnIds}
+                        stickyLeadingOffsets={stickyLeadingOffsets}
+                        isLastStickyLeadingColumn={
+                          header.column.id === lastStickyLeadingColumnId
+                        }
+                      />
+                    ))}
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={visibleColumnCount}
-                    className="h-32 text-center text-muted-foreground"
-                  >
-                    No results found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                ))}
+              </thead>
 
-      <DataTablePagination table={table} />
+              <tbody>
+                {isLoading ? (
+                  <DataTableSkeleton
+                    columns={visibleColumnCount}
+                    rows={defaultPageSize}
+                    stickyLeadingOffsets={stickyLeadingColumnIds.map(
+                      (columnId) => stickyLeadingOffsets[columnId],
+                    )}
+                  />
+                ) : table.getRowModel().rows.length ? (
+                  table.getRowModel().rows.map((row) => (
+                    <tr
+                      key={row.id}
+                      data-state={row.getIsSelected() ? 'selected' : undefined}
+                      className="group/row border-b border-border transition-colors last:border-0 hover:bg-muted/30 data-[state=selected]:bg-primary/5"
+                    >
+                      {row.getVisibleCells().map((cell) => {
+                        const isSticky = stickyLeadingColumnIds.includes(
+                          cell.column.id,
+                        )
+
+                        return (
+                          <td
+                            key={cell.id}
+                            className={cn(
+                              'py-3 align-middle',
+                              cell.column.id === 'select'
+                                ? 'px-3 text-center'
+                                : 'px-4',
+                              // `bg-card`/hover/selected fijan el MISMO `background-color`:
+                              // no se "apilan" — la que gane por especificidad
+                              // reemplaza a las demás por completo. Con
+                              // `bg-muted/30` (alfa parcial, mezclado con
+                              // transparent) el hover REEMPLAZABA el fondo
+                              // opaco por uno ~70% transparente, dejando ver el
+                              // contenido scrolleado detrás — invisible sin
+                              // scroll (nada distinto detrás todavía), visible
+                              // en cuanto hay contenido de otra columna físicamente
+                              // debajo. Se usan colores ya opacos (`color-mix`
+                              // contra `--color-card`, mismo espacio `oklab` que
+                              // genera Tailwind) para que el tinte de hover/selección
+                              // siga leyéndose igual mientras el fondo se mantiene
+                              // opaco en los tres estados.
+                              isSticky &&
+                                cn(
+                                  'sticky z-10 bg-card',
+                                  'group-hover/row:bg-[color-mix(in_oklab,var(--color-muted)_30%,var(--color-card))]',
+                                  'group-data-[state=selected]/row:bg-[color-mix(in_oklab,var(--color-primary)_5%,var(--color-card))]',
+                                ),
+                              cell.column.id === lastStickyLeadingColumnId &&
+                                STICKY_LEADING_BORDER_CLASS,
+                            )}
+                            style={{
+                              width: cell.column.getSize(),
+                              ...(isSticky
+                                ? {
+                                    left: stickyLeadingOffsets[cell.column.id],
+                                  }
+                                : undefined),
+                            }}
+                          >
+                            {isSelectionColumn(cell.column.id) ? (
+                              <SelectionVisibilityContainer
+                                isVisible={row.getIsSelected()}
+                                boundaryProps={selectionBoundaryProps}
+                                revealOnHoverClassName="group-hover/row:opacity-100 group-hover/row:pointer-events-auto"
+                              >
+                                {flexRender(
+                                  cell.column.columnDef.cell,
+                                  cell.getContext(),
+                                )}
+                              </SelectionVisibilityContainer>
+                            ) : (
+                              flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext(),
+                              )
+                            )}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={visibleColumnCount}
+                      className="h-32 text-center text-muted-foreground"
+                    >
+                      No results found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <DataTablePagination table={table} />
+      </div>
     </div>
   )
 }
@@ -422,10 +482,7 @@ interface ColumnHeaderProps {
 export function ColumnHeader({ icon: Icon, children }: ColumnHeaderProps) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <Icon
-        className="size-3.5 shrink-0 opacity-60"
-        aria-hidden="true"
-      />
+      <Icon className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />
       {children}
     </span>
   )
@@ -444,7 +501,11 @@ function DataTableHeaderCell<TData extends RowData>({
 
   return (
     <th
-      className={getHeaderCellClassName(columnId, isSticky, isLastStickyLeadingColumn)}
+      className={getHeaderCellClassName(
+        columnId,
+        isSticky,
+        isLastStickyLeadingColumn,
+      )}
       style={{
         width: header.getSize(),
         ...(isSticky ? { left: stickyLeadingOffsets[columnId] } : undefined),
@@ -487,7 +548,12 @@ function HeaderCellInner<TData extends RowData>({
         header.column.id === 'select' ? 'justify-center' : 'pr-3',
       )}
     >
-      <div className={cn('min-w-0 flex-1', header.column.id === 'select' && 'flex justify-center')}>
+      <div
+        className={cn(
+          'min-w-0 flex-1',
+          header.column.id === 'select' && 'flex justify-center',
+        )}
+      >
         {isSelectColumn ? (
           <SelectionVisibilityContainer
             isVisible={hasSelectedRows}
@@ -589,9 +655,9 @@ function SelectionVisibilityContainer({
         isVisible
           ? 'opacity-100 pointer-events-auto'
           : cn(
-            'opacity-0 pointer-events-none focus-within:opacity-100 focus-within:pointer-events-auto',
-            revealOnHoverClassName,
-          ),
+              'opacity-0 pointer-events-none focus-within:opacity-100 focus-within:pointer-events-auto',
+              revealOnHoverClassName,
+            ),
       )}
     >
       {children}
@@ -606,7 +672,11 @@ function SortableHeader({
   children,
 }: SortableHeaderProps) {
   if (!canSort) {
-    return <span className="inline-flex min-w-0 items-center gap-1.5">{children}</span>
+    return (
+      <span className="inline-flex min-w-0 items-center gap-1.5">
+        {children}
+      </span>
+    )
   }
 
   return (
@@ -692,11 +762,10 @@ function normalizeColumnSizing(
   const availableIds = new Set(availableColumnIds)
 
   return Object.fromEntries(
-    Object.entries(currentSizing).filter(([columnId, size]) => (
-      availableIds.has(columnId)
-        && Number.isFinite(size)
-        && size > 0
-    )),
+    Object.entries(currentSizing).filter(
+      ([columnId, size]) =>
+        availableIds.has(columnId) && Number.isFinite(size) && size > 0,
+    ),
   )
 }
 
@@ -712,11 +781,7 @@ function areColumnSizingStatesEqual(
   return currentEntries.every(([columnId, size]) => next[columnId] === size)
 }
 
-function clampColumnSize(
-  nextSize: number,
-  minSize?: number,
-  maxSize?: number,
-) {
+function clampColumnSize(nextSize: number, minSize?: number, maxSize?: number) {
   const resolvedMinSize = minSize ?? 96
   const resolvedMaxSize = maxSize ?? Number.POSITIVE_INFINITY
 
@@ -736,13 +801,15 @@ function readPersistedColumnSizing(
     const parsedValue = JSON.parse(rawValue) as Partial<PersistedColumnSizing>
 
     return {
-      columnSizing: parsedValue.columnSizing != null && typeof parsedValue.columnSizing === 'object'
-        ? Object.fromEntries(
-          Object.entries(parsedValue.columnSizing).filter(([, size]) => (
-            typeof size === 'number' && Number.isFinite(size)
-          )),
-        )
-        : {},
+      columnSizing:
+        parsedValue.columnSizing != null &&
+        typeof parsedValue.columnSizing === 'object'
+          ? Object.fromEntries(
+              Object.entries(parsedValue.columnSizing).filter(
+                ([, size]) => typeof size === 'number' && Number.isFinite(size),
+              ),
+            )
+          : {},
     }
   } catch {
     return null
