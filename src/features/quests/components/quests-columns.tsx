@@ -27,7 +27,10 @@ import {
 } from 'lucide-react'
 
 import { ColumnHeader } from '#/components/ui/data-table'
-import type { DataTableFilterDef } from '#/components/ui/data-table-filter'
+import type {
+  DataTableFilterDef,
+  DataTableFilterOptionIconProps,
+} from '#/components/ui/data-table-filter'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { Tooltip } from '#/components/ui/tooltip'
@@ -154,6 +157,21 @@ function createMemberFilterDef(
   label: string,
   members: readonly MemberOption[],
 ): DataTableFilterDef {
+  // Del contrato del slot `icon` se reenvía `aria-hidden` (el avatar es
+  // decorativo en la lista: el nombre ya va al lado como texto, y sin esto el
+  // fallback de iniciales se anunciaría dos veces). `className` NO se reenvía
+  // a propósito: trae sizing de Lucide (`size-3.5`) y el avatar fija el suyo
+  // con `size="xs"` para igualar el de los avatares reales.
+  const memberIcon =
+    (member: MemberOption | null) =>
+    ({ 'aria-hidden': ariaHidden }: DataTableFilterOptionIconProps) => (
+      <MemberAvatarOrPlaceholder
+        member={member}
+        size="xs"
+        aria-hidden={ariaHidden}
+      />
+    )
+
   return {
     id: field,
     columnId: field,
@@ -162,12 +180,12 @@ function createMemberFilterDef(
       {
         value: UNASSIGNED_VALUE,
         label: 'Unassigned',
-        icon: () => <MemberAvatarOrPlaceholder member={null} size="xs" />,
+        icon: memberIcon(null),
       },
       ...members.map((member, index) => ({
         value: member.userId,
         label: member.name ?? 'Unknown member',
-        icon: () => <MemberAvatarOrPlaceholder member={member} size="xs" />,
+        icon: memberIcon(member),
         // Separador antes del primer miembro real: distingue visualmente el
         // grupo "Unassigned" del listado de miembros que le sigue.
         separatorBefore: index === 0,

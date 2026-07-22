@@ -3,11 +3,11 @@
  * Al hacer clic, el texto se convierte en un textarea auto-expandible.
  * Confirma con Cmd/Ctrl+Enter o al perder el foco; cancela con Escape.
  */
-import { useEffect, useRef, useState } from 'react'
 import { Pencil } from 'lucide-react'
 
 import { cn } from '#/lib/utils'
 import { Textarea } from '#/components/ui/textarea'
+import { useInlineEdit } from '../hooks/use-inline-edit'
 
 interface InlineEditDescriptionProps {
   value: string | null
@@ -23,41 +23,33 @@ export function InlineEditDescription({
   className,
   readOnly = false,
 }: InlineEditDescriptionProps) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(value ?? '')
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  // Enfocar y colocar el cursor al final al entrar en modo edición
-  useEffect(() => {
-    if (editing) {
-      const el = textareaRef.current
-      el?.focus()
-      el?.setSelectionRange(el.value.length, el.value.length)
-    }
-  }, [editing])
-
-  // Sincronizar el draft con el valor externo (p.ej., rollback optimista)
-  useEffect(() => {
-    if (!editing) setDraft(value ?? '')
-  }, [value, editing])
-
-  const commit = () => {
-    const trimmed = draft.trim()
-    if (trimmed !== (value ?? '')) {
-      onSave(trimmed)
-    }
-    setEditing(false)
-  }
-
-  const cancel = () => {
-    setDraft(value ?? '')
-    setEditing(false)
-  }
+  const {
+    editing,
+    draft,
+    setDraft,
+    fieldRef,
+    startEditing,
+    commit,
+    handleKeyDown,
+  } = useInlineEdit<string, HTMLTextAreaElement>({
+    // `null` (sin descripción) se normaliza a '' — el handler del servidor
+    // vuelve a convertir '' en null al guardar
+    value: value ?? '',
+    onSave,
+    toDraft: (description) => description,
+    fromDraft: (text) => text.trim(),
+    // Texto largo: al reabrir se suele continuar, no reemplazar entero
+    focusMode: 'cursor-end',
+    // Enter inserta salto de línea; confirma Cmd/Ctrl+Enter
+    commitKey: 'mod-enter',
+  })
 
   // Solo lectura: mismo texto (o mensaje vacío), sin afordancia de edición
   if (readOnly) {
     return value ? (
-      <p className={cn('whitespace-pre-wrap text-sm text-foreground', className)}>
+      <p
+        className={cn('whitespace-pre-wrap text-sm text-foreground', className)}
+      >
         {value}
       </p>
     ) : (
@@ -70,20 +62,11 @@ export function InlineEditDescription({
   if (editing) {
     return (
       <Textarea
-        ref={textareaRef}
+        ref={fieldRef}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault()
-            commit()
-          }
-          if (e.key === 'Escape') {
-            e.preventDefault()
-            cancel()
-          }
-        }}
+        onKeyDown={handleKeyDown}
         placeholder="Add description"
         maxLength={500}
         rows={3}
@@ -96,10 +79,7 @@ export function InlineEditDescription({
   return (
     <button
       type="button"
-      onClick={() => {
-        setDraft(value ?? '')
-        setEditing(true)
-      }}
+      onClick={startEditing}
       className={cn(
         'group flex w-full items-start gap-1.5 rounded px-1.5 py-0.5 -mx-1.5',
         'cursor-pointer text-left transition-colors hover:bg-muted/50',

@@ -9,7 +9,7 @@ import { and, asc, count, eq } from 'drizzle-orm'
 import { db } from '#/db'
 import { guildMembers, guilds, user } from '#/db/schema'
 import { auth } from '#/lib/auth'
-import { getUserInitials } from '#/lib/get-user-initials'
+import { toMemberWithInitials } from './member-shaping'
 import { getGuildInvitePreviewSchema } from '../schemas/guild-schemas'
 
 // Avatares visibles en la tarjeta de invitación antes del contador "+N"
@@ -84,12 +84,12 @@ export const getGuildInvitePreview = createServerFn({ method: 'GET' })
         description: guild.description,
         memberCount,
         // Solo datos públicos: iniciales + imagen. Sin nombres completos,
-        // ids, emails ni roles de los demás miembros.
-        members: previewMembers.map((m) => ({
-          image: m.image,
-          avatarId: m.avatarId,
-          initials: getUserInitials(m.name, m.email),
-        })),
+        // ids, emails ni roles de los demás miembros — el helper ya retira el
+        // email y deriva las iniciales; el pick explícito descarta el resto.
+        members: previewMembers.map((m) => {
+          const { image, avatarId, initials } = toMemberWithInitials(m)
+          return { image, avatarId, initials }
+        }),
       },
       viewer: {
         isAuthenticated,

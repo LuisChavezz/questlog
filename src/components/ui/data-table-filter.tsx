@@ -1,10 +1,12 @@
 /**
- * DataTableFilterBar — barra de filtros compacta (estilo Notion/ERP) para usar
- * dentro del `filterPanel` de `DataTable`. Cada filtro activo se resume en un
- * chip ("Status: Backlog, To Do") con una "×" para limpiarlo; los filtros aún
- * sin chip aparecen listados en el menú "Add filter". Opera sobre
- * `columnFilters` de TanStack Table — cada `DataTableFilterDef` mapea a una
- * columna cuyo `filterFn` espera `string[]` (varios valores = OR entre ellos).
+ * DataTableFilterBar — barra de filtros compacta (estilo Notion/ERP) que
+ * `DataTable` renderiza por su cuenta a partir de su prop `filters` (los
+ * callers pasan las definiciones como datos, no este componente ya montado).
+ * Cada filtro activo se resume en un chip ("Status: Backlog, To Do") con una
+ * "×" para limpiarlo; los filtros aún sin chip aparecen listados en el menú
+ * "Add filter". Opera sobre `columnFilters` de TanStack Table — cada
+ * `DataTableFilterDef` mapea a una columna cuyo `filterFn` espera `string[]`
+ * (varios valores = OR entre ellos).
  *
  * "Add filter" y el chip activo comparten un único flujo de edición: elegir
  * una columna en "Add filter" solo crea su chip (con `[]`, sin valores) y
@@ -13,6 +15,7 @@
  * capturar el primer valor en el mismo click.
  */
 import { Fragment, useEffect, useMemo, useState } from 'react'
+import type { AriaAttributes } from 'react'
 import type { Table } from '@tanstack/react-table'
 import { Plus, X } from 'lucide-react'
 
@@ -25,6 +28,19 @@ import {
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
 import { cn } from '#/lib/utils'
+
+/**
+ * Props que `FilterValueOptions` pasa al `icon` de cada opción. Un ícono
+ * Lucide las aplica tal cual a su SVG; un componente propio (como el avatar
+ * de miembro de los filtros de Assignee/Supervisor) decide qué reenviar —
+ * típicamente `aria-hidden` (el ícono es decorativo: el label ya va al lado
+ * como texto), mientras que `className` trae sizing pensado para SVGs de
+ * Lucide y un avatar puede preferir conservar el suyo.
+ */
+export interface DataTableFilterOptionIconProps {
+  className?: string
+  'aria-hidden'?: AriaAttributes['aria-hidden']
+}
 
 export interface DataTableFilterOption {
   value: string

@@ -6,7 +6,7 @@ import { and, asc, count, desc, eq, gte, notInArray } from 'drizzle-orm'
 import { db } from '#/db'
 import { guildMembers, guilds, quests, user } from '#/db/schema'
 import { auth } from '#/lib/auth'
-import { getUserInitials } from '#/lib/get-user-initials'
+import { toMemberWithInitials } from './member-shaping'
 import { isGuildOwner } from '../role-labels'
 import { getGuildInputSchema } from '../schemas/guild-schemas'
 
@@ -140,11 +140,9 @@ export const getGuild = createServerFn({ method: 'GET' })
         inProgressCount: inProgressRow.count,
         completedThisWeekCount: completedWeekRow.count,
       },
-      // Iniciales como fallback del avatar, vía el helper compartido
-      members: membersResult.map(({ email, ...m }) => ({
-        ...m,
-        initials: getUserInitials(m.name, email),
-      })),
+      // Iniciales de respaldo del avatar + retiro del email, vía el helper
+      // compartido con `get-quest-guilds`
+      members: membersResult.map(toMemberWithInitials),
       recentActivity: recentActivityResult,
     }
   })

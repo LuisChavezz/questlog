@@ -3,10 +3,10 @@
  * Al hacer clic, el título se convierte en un input de texto.
  * Confirma con Enter o al perder el foco; cancela con Escape.
  */
-import { useEffect, useRef, useState } from 'react'
 import { Pencil } from 'lucide-react'
 
 import { cn } from '#/lib/utils'
+import { useInlineEdit } from '../hooks/use-inline-edit'
 
 interface InlineEditTitleProps {
   value: string
@@ -22,35 +22,22 @@ export function InlineEditTitle({
   className,
   readOnly = false,
 }: InlineEditTitleProps) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(value)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  // Enfocar y seleccionar el input al entrar en modo edición
-  useEffect(() => {
-    if (editing) {
-      inputRef.current?.focus()
-      inputRef.current?.select()
-    }
-  }, [editing])
-
-  // Sincronizar el draft con el valor externo (p.ej., rollback optimista)
-  useEffect(() => {
-    if (!editing) setDraft(value)
-  }, [value, editing])
-
-  const commit = () => {
-    const trimmed = draft.trim()
-    if (trimmed && trimmed !== value) {
-      onSave(trimmed)
-    }
-    setEditing(false)
-  }
-
-  const cancel = () => {
-    setDraft(value)
-    setEditing(false)
-  }
+  const {
+    editing,
+    draft,
+    setDraft,
+    fieldRef,
+    startEditing,
+    commit,
+    handleKeyDown,
+  } = useInlineEdit<string, HTMLInputElement>({
+    value,
+    onSave,
+    toDraft: (title) => title,
+    fromDraft: (text) => text.trim(),
+    // Un título vacío no se guarda — confirmar en blanco equivale a descartar
+    canCommit: (title) => title !== '',
+  })
 
   // Solo lectura: mismo texto, sin botón ni lápiz de edición
   if (readOnly) {
@@ -69,20 +56,11 @@ export function InlineEditTitle({
   if (editing) {
     return (
       <input
-        ref={inputRef}
+        ref={fieldRef}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault()
-            commit()
-          }
-          if (e.key === 'Escape') {
-            e.preventDefault()
-            cancel()
-          }
-        }}
+        onKeyDown={handleKeyDown}
         className={cn(
           'w-full rounded border border-ring bg-background px-1.5 py-0.5',
           'text-sm font-medium text-foreground outline-none',
@@ -99,10 +77,7 @@ export function InlineEditTitle({
   return (
     <button
       type="button"
-      onClick={() => {
-        setDraft(value)
-        setEditing(true)
-      }}
+      onClick={startEditing}
       className={cn(
         'group flex w-full items-center gap-1.5 rounded px-1.5 py-0.5 -mx-1.5',
         'cursor-pointer text-left transition-colors hover:bg-muted/50',
@@ -111,7 +86,9 @@ export function InlineEditTitle({
       )}
       aria-label={`Edit title: ${value}`}
     >
-      <span className="min-w-0 truncate font-medium text-foreground">{value}</span>
+      <span className="min-w-0 truncate font-medium text-foreground">
+        {value}
+      </span>
       <Pencil
         className="size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-40"
         aria-hidden="true"

@@ -22,10 +22,13 @@ interface DataTableToolbarProps<TData> {
   /** Slot derecho: acciones como botones de creación, filtros, etc. */
   actions?: ReactNode
   /**
-   * Barra de filtros (chips + "Add filter"), ya resuelta contra `table` por
-   * el caller (`DataTable` pasa `table` a su prop `filterPanel`). Se muestra
-   * debajo de la fila de controles, colapsable vía el botón de sliders — el
-   * toggle solo oculta/muestra la fila, nunca limpia los filtros activos.
+   * Barra de filtros (chips + "Add filter"), construida por `DataTable` a
+   * partir de su prop `filters` y pasada aquí SOLO cuando hay filtros que
+   * ofrecer — `undefined` significa "sin filtros", así que gatear el toggle y
+   * la fila colapsable por esta prop es fiable (nunca llega un nodo que
+   * renderice vacío). Se muestra debajo de la fila de controles, colapsable
+   * vía el botón de sliders — el toggle solo oculta/muestra la fila, nunca
+   * limpia los filtros activos.
    */
   filterPanel?: ReactNode
   /**

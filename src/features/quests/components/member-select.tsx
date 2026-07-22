@@ -7,6 +7,7 @@
  * Reutiliza UserAvatar para cada opción y expone un valor `string | null`
  * (null = sin asignar) para no acoplar a los llamadores al centinela interno.
  */
+import type { AriaAttributes } from 'react'
 import { ChevronDown, User } from 'lucide-react'
 import { Select as SelectPrimitive } from 'radix-ui'
 
@@ -83,13 +84,22 @@ function MemberOptionLabel({ member }: { member: MemberOption }) {
 export function MemberAvatarOrPlaceholder({
   member,
   size = 'sm',
+  'aria-hidden': ariaHidden,
 }: {
   member: MemberOption | null | undefined
   size?: 'xs' | 'sm'
+  /**
+   * Marca el avatar entero como decorativo para lectores de pantalla. En el
+   * filtro de Assignee/Supervisor el nombre del miembro ya aparece como texto
+   * al lado, y sin esto el fallback de iniciales del avatar se anunciaría por
+   * duplicado ("GH Grace Hopper").
+   */
+  'aria-hidden'?: AriaAttributes['aria-hidden']
 }) {
   if (!member) {
     return (
       <span
+        aria-hidden={ariaHidden}
         className={cn(
           'flex shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground',
           size === 'xs' ? 'size-4' : 'size-6',
@@ -110,6 +120,7 @@ export function MemberAvatarOrPlaceholder({
       avatarId={member.avatarId}
       initials={member.initials}
       size={size}
+      aria-hidden={ariaHidden}
     />
   )
 }

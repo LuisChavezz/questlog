@@ -35,6 +35,8 @@ import type {
   DataTableBulkAction,
   DataTableSelectionBoundaryProps,
 } from '#/components/ui/data-table-bulk-actions'
+import { DataTableFilterBar } from '#/components/ui/data-table-filter'
+import type { DataTableFilterDef } from '#/components/ui/data-table-filter'
 import { DataTablePagination } from '#/components/ui/data-table-pagination'
 import {
   DataTableSkeleton,
@@ -64,18 +66,16 @@ interface DataTableProps<TData extends RowData, TValue> {
   /** Slot derecho de la toolbar: acciones como botones de creación, filtros, etc. */
   actions?: React.ReactNode
   /**
-   * Render prop para la barra de filtros de columna (chips + "Add filter",
-   * debajo de la toolbar). Recibe la instancia de `table` para leer/escribir
-   * `columnFilters` — normalmente vía `DataTableFilterBar` — y si la fila de
-   * filtros está actualmente expandida, para que el caller pueda cerrar sus
-   * propios dropdowns abiertos (de un chip, de "Add filter") cuando el
-   * usuario colapsa la fila con el toggle del toolbar. Omitir la prop deja la
-   * tabla sin esa UI.
+   * Definiciones de filtro de columna para la barra de chips + "Add filter"
+   * (debajo de la toolbar). `DataTable` renderiza la `DataTableFilterBar` por
+   * su cuenta a partir de esta lista — se pasa como DATOS (no como nodo ya
+   * renderizado) para que el toggle de la toolbar y la fila colapsable puedan
+   * decidir su visibilidad mirando `filters.length`: un elemento JSX siempre
+   * es "truthy" aunque termine renderizando null, así que gatearlos por nodo
+   * dejaría un botón muerto ante una lista vacía. Omitir la prop (o pasar
+   * `[]`) deja la tabla sin esa UI.
    */
-  filterPanel?: (
-    table: Table<TData>,
-    filterPanelOpen: boolean,
-  ) => React.ReactNode
+  filters?: readonly DataTableFilterDef[]
   /**
    * IDs de columna que se fijan (`position: sticky`) al borde izquierdo, EN
    * ORDEN de aparición, para que la identidad de la fila siga visible durante
@@ -90,6 +90,9 @@ interface DataTableProps<TData extends RowData, TValue> {
 // literal `[]` en la firma de la función se recrea en cada render, lo que
 // invalidaría el useMemo de los offsets en cada render aunque nada cambie.
 const NO_STICKY_LEADING_COLUMN_IDS: readonly string[] = []
+
+// Mismo criterio para el default de `filters`: referencia estable.
+const NO_FILTER_DEFS: readonly DataTableFilterDef[] = []
 
 interface PersistedColumnSizing {
   columnSizing: ColumnSizingState
@@ -123,7 +126,7 @@ export function DataTable<TData extends RowData, TValue>({
   enableRowSelection = true,
   bulkActions = [],
   actions,
-  filterPanel,
+  filters = NO_FILTER_DEFS,
   stickyLeadingColumnIds = NO_STICKY_LEADING_COLUMN_IDS,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
@@ -135,6 +138,10 @@ export function DataTable<TData extends RowData, TValue>({
   // sí se guarda) — siempre arranca colapsada. Vive aquí (no en el toolbar)
   // porque también decide el `gap` toolbar-tabla de más abajo.
   const [filterPanelOpen, setFilterPanelOpen] = React.useState(false)
+  // Con lista vacía no se renderiza barra de filtros NI su toggle en la
+  // toolbar — gatear por datos (y no por un nodo, siempre "truthy") es lo que
+  // evita un botón de filtros muerto sobre una fila vacía.
+  const hasFilterBar = filters.length > 0
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({})
@@ -327,13 +334,31 @@ export function DataTable<TData extends RowData, TValue>({
     // solo resuelve conflictos entre clases del MISMO elemento, así que un
     // `className="gap-2"` externo no puede pisar silenciosamente el toggle.
     <div className={className}>
-      <div className={cn('flex flex-col', filterPanelOpen ? 'gap-4' : 'gap-0')}>
+      <div
+        className={cn(
+          'flex flex-col',
+          // El toggle a `gap-0` solo tiene sentido cuando SÍ hay una fila de
+          // filtros que colapsar — sin filtros, no hay nada que este `gap`
+          // esté supliendo, y debe mantenerse en su valor de siempre. Como
+          // `filters` son datos (no un nodo), `hasFilterBar` refleja contenido
+          // real: una lista vacía nunca hereda `gap-0` por accidente.
+          hasFilterBar ? (filterPanelOpen ? 'gap-4' : 'gap-0') : 'gap-4',
+        )}
+      >
         <DataTableToolbar
           table={table}
           filterPlaceholder={filterPlaceholder}
           leadingContent={toolbarLeadingContent}
           actions={actions}
-          filterPanel={filterPanel?.(table, filterPanelOpen)}
+          filterPanel={
+            hasFilterBar ? (
+              <DataTableFilterBar
+                table={table}
+                filters={filters}
+                filterPanelOpen={filterPanelOpen}
+              />
+            ) : undefined
+          }
           filterPanelOpen={filterPanelOpen}
           onFilterPanelOpenChange={setFilterPanelOpen}
         />

@@ -3,11 +3,11 @@
  * Muestra los badges de tags; al hacer clic se convierte en un input de texto
  * con valores separados por comas. Confirma con Enter/blur, cancela con Escape.
  */
-import { useEffect, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 
 import { cn } from '#/lib/utils'
 import { Badge } from '#/components/ui/badge'
+import { useInlineEdit } from '../hooks/use-inline-edit'
 
 interface InlineEditTagsProps {
   value: string[]
@@ -21,40 +21,27 @@ export function InlineEditTags({
   onSave,
   readOnly = false,
 }: InlineEditTagsProps) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(value.join(', '))
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (editing) {
-      inputRef.current?.focus()
-      inputRef.current?.select()
-    }
-  }, [editing])
-
-  // Sincronizar el draft cuando el valor externo cambia (p.ej., rollback)
-  useEffect(() => {
-    if (!editing) setDraft(value.join(', '))
-  }, [value, editing])
-
-  const commit = () => {
-    const newTags = draft
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean)
-
-    // Solo guardar si el contenido cambió
-    const changed =
-      newTags.length !== value.length || newTags.some((t, i) => t !== value[i])
-
-    if (changed) onSave(newTags)
-    setEditing(false)
-  }
-
-  const cancel = () => {
-    setDraft(value.join(', '))
-    setEditing(false)
-  }
+  const {
+    editing,
+    draft,
+    setDraft,
+    fieldRef,
+    startEditing,
+    commit,
+    handleKeyDown,
+  } = useInlineEdit<string[], HTMLInputElement>({
+    value,
+    onSave,
+    toDraft: (tags) => tags.join(', '),
+    fromDraft: (text) =>
+      text
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+    // Igualdad por contenido: el array parseado siempre es una instancia nueva
+    isEqual: (a, b) =>
+      a.length === b.length && a.every((tag, i) => tag === b[i]),
+  })
 
   // Solo lectura: mismos badges (o guion si no hay), sin botón de edición
   if (readOnly) {
@@ -76,20 +63,11 @@ export function InlineEditTags({
   if (editing) {
     return (
       <input
-        ref={inputRef}
+        ref={fieldRef}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault()
-            commit()
-          }
-          if (e.key === 'Escape') {
-            e.preventDefault()
-            cancel()
-          }
-        }}
+        onKeyDown={handleKeyDown}
         placeholder="tag1, tag2, tag3"
         autoComplete="off"
         className={cn(
@@ -105,10 +83,7 @@ export function InlineEditTags({
   return (
     <button
       type="button"
-      onClick={() => {
-        setDraft(value.join(', '))
-        setEditing(true)
-      }}
+      onClick={startEditing}
       className={cn(
         'group flex w-full flex-wrap items-center gap-1 rounded px-1 py-0.5 -mx-1',
         'cursor-pointer text-left transition-colors hover:bg-muted/50',
