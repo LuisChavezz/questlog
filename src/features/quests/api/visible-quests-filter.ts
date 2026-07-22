@@ -1,6 +1,6 @@
 // Filtro compartido del conjunto de quests que ve un usuario en su lista
 // personal (`/quests`): sus quests personales (sin guild) MÁS las quests de
-// guild donde es creador o supervisor — no todas las del guild.
+// guild donde es creador, supervisor o asignado — no todas las del guild.
 //
 // En el tramo de guild se exige además pertenencia VIGENTE: expulsar a un
 // miembro limpia sus asignaciones (assignee/supervisor) pero NO su autoría, así
@@ -20,20 +20,27 @@ import { db } from '#/db'
 import { guildMembers, quests } from '#/db/schema'
 
 // El rol que hace visible una quest de guild en la lista personal: ser su
-// creador o su supervisor. Separado de `buildVisibleQuestsFilter` para que
-// `getQuestGuilds` pueda aplicar SOLO este criterio cuando su propia query ya
-// estableció lo demás (membresía vigente vía su JOIN, y guildId no nulo al
-// estar fijado al guild del row exterior) — un único lugar define el rol, sin
-// re-evaluar condiciones ya garantizadas.
+// creador, su supervisor o su asignado — ser asignado es la forma más directa
+// de "esto es mío", así que excluirlo sería dejar fuera justo el caso que
+// más le importa a un Member sin autoría ni supervisión. Separado de
+// `buildVisibleQuestsFilter` para que `getQuestGuilds` pueda aplicar SOLO
+// este criterio cuando su propia query ya estableció lo demás (membresía
+// vigente vía su JOIN, y guildId no nulo al estar fijado al guild del row
+// exterior) — un único lugar define el rol, sin re-evaluar condiciones ya
+// garantizadas.
 export function buildGuildQuestRoleFilter(userId: string) {
-  return or(eq(quests.ownerId, userId), eq(quests.supervisorId, userId))
+  return or(
+    eq(quests.ownerId, userId),
+    eq(quests.supervisorId, userId),
+    eq(quests.assigneeId, userId),
+  )
 }
 
 export function buildVisibleQuestsFilter(userId: string) {
   return or(
     // Personales: propias y sin guild
     and(eq(quests.ownerId, userId), isNull(quests.guildId)),
-    // De guild: creador o supervisor, y miembro vigente del guild
+    // De guild: creador, supervisor o asignado, y miembro vigente del guild
     and(
       isNotNull(quests.guildId),
       buildGuildQuestRoleFilter(userId),

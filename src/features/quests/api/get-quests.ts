@@ -1,9 +1,9 @@
 // Función de servidor — obtiene las quests que el usuario autenticado ve en su
-// lista personal: las suyas sin guild más las de guild donde es creador o
-// supervisor. El criterio exacto vive en `buildVisibleQuestsFilter`, compartido
-// con `getQuestGuilds` para que ambas queries describan el mismo conjunto de
-// filas (si divergen, la lista personal pintaría quests sin sección de guild
-// donde vivir, o secciones sin quests).
+// lista personal: las suyas sin guild más las de guild donde es creador,
+// supervisor o asignado. El criterio exacto vive en `buildVisibleQuestsFilter`,
+// compartido con `getQuestGuilds` para que ambas queries describan el mismo
+// conjunto de filas (si divergen, la lista personal pintaría quests sin
+// sección de guild donde vivir, o secciones sin quests).
 //
 // Devuelve `Quest[]` a secas (sin datos del guild embebidos): la caché
 // `['quests']` es un array de `Quest` sobre el que operan todos los hooks de

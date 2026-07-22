@@ -459,6 +459,27 @@ describe('Quests page — permisos heredados de la tabla de guild', () => {
     ).toBeNull()
   })
 
+  it('un Member que solo es asignado ve la quest y su sección de guild', () => {
+    // Ni dueño estructural del guild ni creador/supervisor de la quest: el
+    // único vínculo es ser el asignado. Antes de este fix, `/quests` no
+    // mostraba ni la quest ni la sección de "Dev Guild" para este caso.
+    renderQuests(
+      [
+        makeQuest({
+          id: 'q-dev',
+          guildId: 'guild-dev',
+          ownerId: 'user-2',
+          assigneeId: CURRENT_USER_ID,
+          title: 'Slay the dragon',
+        }),
+      ],
+      [{ ...QUEST_GUILDS[0], currentUserRole: 'member' }],
+    )
+
+    const devGuild = getSectionByLabel('Dev Guild')
+    expect(within(devGuild).getByText('Slay the dragon')).not.toBeNull()
+  })
+
   it('permite reasignar en la tabla del guild — su roster sí está disponible', () => {
     renderQuests([
       makeQuest({
