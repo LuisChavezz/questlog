@@ -8,7 +8,7 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 import { ThemeProvider } from '../components/providers/theme-provider'
-import { NotFoundPage } from '../components/not-found-page'
+import { NotFoundPage } from '#/components/not-found-page'
 
 import appCss from '../styles.css?url'
 
