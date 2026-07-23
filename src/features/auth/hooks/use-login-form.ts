@@ -12,7 +12,7 @@ import {
 // Hook que encapsula la lógica del formulario de inicio de sesión
 export function useLoginForm() {
   const navigate = useNavigate()
-  // Destino tras iniciar sesión: el `redirect` de la URL o el dashboard por defecto
+  // Destino tras iniciar sesión: el `redirect` de la URL o quests por defecto
   const { redirect } = useSearch({ strict: false })
   const [serverError, setServerError] = useState<string | null>(null)
 

@@ -13,7 +13,7 @@ import {
 // Hook que encapsula la lógica del formulario de registro
 export function useRegisterForm() {
   const navigate = useNavigate()
-  // Destino tras registrarse: el `redirect` de la URL o el dashboard por defecto
+  // Destino tras registrarse: el `redirect` de la URL o quests por defecto
   const { redirect } = useSearch({ strict: false })
   const [serverError, setServerError] = useState<string | null>(null)
 

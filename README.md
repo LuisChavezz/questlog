@@ -53,8 +53,7 @@ src/
 │   └── seed.ts          # Test data seeder
 ├── features/            # Domain modules (feature-sliced)
 │   ├── auth/            # Login, register, schemas, hooks
-│   ├── dashboard/       # Dashboard page (placeholder)
-│   └── quests/          # Quests CRUD, table, inline editors, bulk actions
+│   └── quests/          # Quests CRUD, table, inline editors, bulk actions (primary landing route)
 ├── hooks/               # Shared hooks (use-sidebar)
 ├── integrations/        # TanStack Query setup (SSR, devtools)
 ├── lib/                 # Shared utilities
@@ -64,13 +63,12 @@ src/
 │   └── utils.ts         # cn() helper (clsx + tailwind-merge)
 ├── routes/              # File-based TanStack Router routes
 │   ├── __root.tsx       # Root layout, SEO, anti-FOUC script
-│   ├── index.tsx        # Redirect / → /dashboard
-│   ├── _auth.tsx        # Guest layout (redirects to dashboard if logged in)
+│   ├── index.tsx        # Redirect / → /quests
+│   ├── _auth.tsx        # Guest layout (redirects to quests if logged in)
 │   ├── _auth/login.tsx  # Login page
 │   ├── _auth/register.tsx# Register page
 │   ├── _app.tsx         # Protected layout (redirects to login if not authenticated)
-│   ├── _app/dashboard.tsx
-│   ├── _app/quests.tsx  # Quests page with SSR data preload
+│   ├── _app/quests.tsx  # Quests page with SSR data preload — primary landing destination
 │   └── api/auth/$       # Better Auth API handler (catch-all)
 ├── stores/              # Zustand stores (theme)
 ├── router.tsx           # Router factory (SSR + Query integration)
@@ -80,14 +78,13 @@ src/
 
 ### Route Design
 
-| Path              | Layout    | Auth Required | Description            |
-| ----------------- | --------- | ------------- | ---------------------- |
-| `/`               | None      | —             | Redirects to dashboard |
-| `/login`          | `_auth`   | No            | Sign in                |
-| `/register`       | `_auth`   | No            | Create account         |
-| `/dashboard`      | `_app`    | Yes           | Dashboard overview     |
-| `/quests`         | `_app`    | Yes           | Quest management table |
-| `/api/auth/$`     | None      | —             | Better Auth API        |
+| Path              | Layout    | Auth Required | Description                              |
+| ----------------- | --------- | ------------- | ----------------------------------------- |
+| `/`               | None      | —             | Redirects to quests                       |
+| `/login`          | `_auth`   | No            | Sign in                                   |
+| `/register`       | `_auth`   | No            | Create account                            |
+| `/quests`         | `_app`    | Yes           | Quest management table (primary landing) |
+| `/api/auth/$`     | None      | —             | Better Auth API                           |
 
 ### Authentication Flow
 
@@ -119,7 +116,6 @@ questlog/
 │   │   └── ui/              # 18 Radix-based components
 │   ├── features/
 │   │   ├── auth/
-│   │   ├── dashboard/
 │   │   └── quests/          # CRUD, hooks, schemas, inline editors
 │   └── routes/              # TanStack Router file-based routes
 ├── components.json          # shadcn/ui configuration

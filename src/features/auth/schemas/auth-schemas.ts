@@ -61,5 +61,5 @@ export function getSafeRedirect(redirect: string | undefined): string {
   if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
     return redirect
   }
-  return '/dashboard'
+  return '/quests'
 }

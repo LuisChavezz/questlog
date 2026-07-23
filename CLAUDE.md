@@ -42,7 +42,7 @@ Required env vars: `DATABASE_URL`, `BETTER_AUTH_SECRET`, optional `BETTER_AUTH_U
 ## Architecture
 
 ### Feature-sliced layout
-Domain code lives in `src/features/<name>/` split into `api/` (server functions + query options), `components/`, `hooks/`, and `schemas/`. `quests` is the reference feature; `auth` follows the same shape; `dashboard` is a placeholder. Shared building blocks live in `src/components/`, `src/lib/`, `src/hooks/`, `src/stores/`.
+Domain code lives in `src/features/<name>/` split into `api/` (server functions + query options), `components/`, `hooks/`, and `schemas/`. `quests` is the reference feature and the app's primary landing destination; `auth` follows the same shape. Shared building blocks live in `src/components/`, `src/lib/`, `src/hooks/`, `src/stores/`.
 
 ### Data flow (server functions, not REST)
 There is no API layer beyond Better Auth's catch-all. All reads/writes go through TanStack Start **server functions** (`createServerFn`) that run on the server even when called from the client:
@@ -56,7 +56,7 @@ There is no API layer beyond Better Auth's catch-all. All reads/writes go throug
 ### Auth & route guards
 - Server config: `src/lib/auth.ts` (Better Auth + Drizzle adapter + `tanstackStartCookies()`). Browser client: `src/lib/auth-client.ts`. The HTTP handler is mounted at the catch-all route `src/routes/api/auth/$.ts`.
 - `getServerSession()` (`src/lib/server/session.ts`) is a server fn that reads the session from request cookies.
-- Two **pathless layout routes** gate everything by running `beforeLoad` on the server: `routes/_app.tsx` redirects to `/login` when there's no session (and exposes `session` on route context); `routes/_auth.tsx` redirects logged-in users to `/dashboard`. Put authenticated pages under `_app/`, guest pages under `_auth/`.
+- Two **pathless layout routes** gate everything by running `beforeLoad` on the server: `routes/_app.tsx` redirects to `/login` when there's no session (and exposes `session` on route context); `routes/_auth.tsx` redirects logged-in users to `/quests`. Put authenticated pages under `_app/`, guest pages under `_auth/`.
 
 ### Database schema
 `src/db/schema.ts` defines the `quests` table + `quest_status`/`quest_priority` enums and re-exports everything from `auth-schema.ts`. **`src/db/auth-schema.ts` is owned by Better Auth — don't hand-edit it.** Inferred types (`Quest`, `NewQuest`, `QuestStatus`, `QuestPriority`) come from the table and are the source of truth across the app. After changing `schema.ts`, run `pnpm db:generate` then `pnpm db:migrate`.
