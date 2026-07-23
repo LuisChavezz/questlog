@@ -168,7 +168,7 @@ export function GuildNavItem({ isExpanded }: GuildNavItemProps) {
                         'text-sm font-medium cursor-pointer',
                         'outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
                         'transition-colors duration-150',
-                        'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                        'bg-primary/10 text-primary hover:bg-primary/10',
                       )}
                     >
                       {/* Badge con la inicial del guild — distingue visualmente de "Guilds" */}
@@ -176,7 +176,7 @@ export function GuildNavItem({ isExpanded }: GuildNavItemProps) {
                         className={cn(
                           'flex h-4.5 w-4.5 items-center justify-center',
                           'rounded text-[10px] font-bold uppercase',
-                          'bg-muted text-muted-foreground',
+                          'bg-primary/15 text-primary',
                         )}
                         aria-hidden="true"
                       >
