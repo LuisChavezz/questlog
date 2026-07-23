@@ -6,6 +6,8 @@
 import { differenceInCalendarDays, format } from 'date-fns'
 import { z } from 'zod'
 
+import type { QuestStatus } from '#/db/schema'
+
 // Patrón ISO 8601 restringido a fechas de calendario: YYYY-MM-DD
 const DATE_INPUT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 
@@ -116,6 +118,84 @@ export function isQuestDueDateOverdue(
 }
 
 /**
+ * Estados "cerrados": una quest completada o cancelada ya no tiene dimensión
+ * de urgencia — ni "overdue" ni "due soon" aplican, sin importar su fecha.
+ * Compartido por `isQuestOverdue` e `isQuestDueSoon`.
+ */
+const CLOSED_QUEST_STATUSES: readonly QuestStatus[] = ['done', 'cancelled']
+
+/**
+ * Definición única de quest "vencida" (overdue): tiene fecha de vencimiento en
+ * el pasado Y su estado no es done/cancelled. Una quest sin fecha nunca está
+ * vencida (lo garantiza `isQuestDueDateOverdue`).
+ *
+ * Fuente compartida por el filtro "Overdue" de la tabla y el badge de Guild
+ * Overview; el conteo del servidor (`get-guild`) replica esta misma regla en
+ * SQL (`lt(dueDate, hoy)` + `notInArray(status, [...])`).
+ */
+export function isQuestOverdue(
+  quest: { dueDate: Date | null; status: QuestStatus },
+  referenceDate = new Date(),
+) {
+  return (
+    !CLOSED_QUEST_STATUSES.includes(quest.status) &&
+    isQuestDueDateOverdue(quest.dueDate, referenceDate)
+  )
+}
+
+// Ventana (en días de calendario, ambos extremos inclusive) que cuenta como
+// "próxima a vencer": hoy mismo hasta 3 días en el futuro.
+const DUE_SOON_WINDOW_DAYS = 3
+
+/**
+ * Indica si una fecha de vencimiento cae dentro de la ventana "due soon"
+ * (hoy..+3 días, inclusive). Compara días de calendario completos —vía
+ * `differenceInCalendarDays` sobre medianoches LOCALES derivadas del string
+ * YYYY-MM-DD, mismo patrón que `formatQuestDueDate`— para no verse afectada
+ * por horas ni por el offset de zona horaria del `Date` original.
+ */
+export function isQuestDueDateSoon(
+  value: Date | null | undefined,
+  referenceDate = new Date(),
+) {
+  const dueDateStr = getQuestDateInputValue(value)
+
+  if (dueDateStr === '') {
+    return false
+  }
+
+  const dueDate = new Date(`${dueDateStr}T00:00:00`)
+  const today = new Date(`${getTodayDateString(referenceDate)}T00:00:00`)
+  const diff = differenceInCalendarDays(dueDate, today)
+
+  return diff >= 0 && diff <= DUE_SOON_WINDOW_DAYS
+}
+
+/**
+ * Definición única de quest "próxima a vencer" (due soon): su fecha cae en la
+ * ventana hoy..+3 días Y su estado no es done/cancelled — misma exclusión y
+ * mismo motivo que `isQuestOverdue` (ver `CLOSED_QUEST_STATUSES`).
+ */
+export function isQuestDueSoon(
+  quest: { dueDate: Date | null; status: QuestStatus },
+  referenceDate = new Date(),
+) {
+  return (
+    !CLOSED_QUEST_STATUSES.includes(quest.status) &&
+    isQuestDueDateSoon(quest.dueDate, referenceDate)
+  )
+}
+
+/**
+ * Indica si una quest no tiene fecha de vencimiento asignada. Sin exclusión de
+ * estado: sin fecha, no hay dimensión de urgencia que evaluar en absoluto —a
+ * diferencia de overdue/due soon, done/cancelled no cambian este resultado.
+ */
+export function isQuestWithoutDueDate(quest: { dueDate: Date | null }) {
+  return quest.dueDate === null
+}
+
+/**
  * Formatea una fecha de vencimiento para mostrarla de forma legible en la UI.
  *
  * Rango relativo:
@@ -172,6 +252,26 @@ export const questStatusSchema = z.enum([
   'done',
   'cancelled',
 ])
+
+/**
+ * Parsea un search param `status` (lista de estados separada por comas, p. ej.
+ * `"backlog,todo,in_progress"` desde los stat cards de Guild Overview) a un
+ * array de `QuestStatus` válidos. Valores desconocidos o vacíos se descartan
+ * en silencio en vez de reventar la navegación — mismo criterio que
+ * `.catch(undefined)` en `authSearchSchema`.
+ */
+export function parseQuestStatusListParam(
+  value: string | undefined,
+): QuestStatus[] {
+  if (!value) return []
+
+  return value
+    .split(',')
+    .filter(
+      (status): status is QuestStatus =>
+        questStatusSchema.safeParse(status).success,
+    )
+}
 
 /** Nivel de prioridad de una quest */
 export const questPrioritySchema = z.enum(['low', 'medium', 'high', 'critical'])

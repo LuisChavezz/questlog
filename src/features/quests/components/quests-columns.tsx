@@ -13,6 +13,9 @@ import {
   ArrowRight,
   ArrowUp,
   Calendar,
+  CalendarClock,
+  CalendarDays,
+  CalendarOff,
   CheckCircle2,
   Circle,
   Clock,
@@ -37,6 +40,11 @@ import { Tooltip } from '#/components/ui/tooltip'
 import { dateFormatter } from '#/lib/format-date'
 
 import type { Quest, QuestPriority, QuestStatus } from '#/db/schema'
+import {
+  isQuestDueSoon,
+  isQuestOverdue,
+  isQuestWithoutDueDate,
+} from '../schemas/quest-schemas'
 import type { UpdateQuestValues } from '../schemas/quest-schemas'
 import { InlineEditTitle } from './inline-edit-title'
 import type { BadgeOption } from './inline-edit-badge'
@@ -141,6 +149,67 @@ export const QUEST_FILTERS: readonly DataTableFilterDef[] = [
     options: PRIORITY_OPTIONS,
   },
 ]
+
+// ─── Filtro de fecha de vencimiento ────────────────────────────────────────────
+
+// Valores del filtro de fecha: cada uno es una opción de multi-select (no un
+// tipo de filtro nuevo) para reutilizar tal cual el chip/dropdown y la semilla
+// por search param ya probados — la diferencia vive solo en el `filterFn`, que
+// no compara contra un valor de celda sino que computa el predicado
+// correspondiente contra la quest completa y la fecha actual.
+const OVERDUE_FILTER_VALUE = 'overdue'
+const DUE_SOON_FILTER_VALUE = 'due-soon'
+const NO_DUE_DATE_FILTER_VALUE = 'no-due-date'
+
+// Predicado de cada opción, indexado por su valor — mismo diccionario que
+// `dueDateFilterFn` recorre para el OR entre opciones seleccionadas y que
+// `DUE_DATE_FILTER` recorre para declarar sus opciones, así que añadir un
+// valor nuevo aquí basta para que ambos lo reconozcan sin tocarlos.
+const DUE_DATE_FILTER_PREDICATES: Partial<
+  Record<string, (quest: Quest) => boolean>
+> = {
+  [OVERDUE_FILTER_VALUE]: isQuestOverdue,
+  [DUE_SOON_FILTER_VALUE]: isQuestDueSoon,
+  [NO_DUE_DATE_FILTER_VALUE]: isQuestWithoutDueDate,
+}
+
+// `filterFn` de la columna de fecha. A diferencia de `multiSelectFilterFn`, no
+// mira `row.getValue` (una fecha no es un valor discreto que "incluir"): evalúa
+// el predicado de cada opción seleccionada contra la quest completa. Varias
+// opciones seleccionadas combinan por OR — mismo criterio que Status/Priority
+// con varios valores marcados (p. ej. Overdue + Due soon muestra la unión).
+function dueDateFilterFn(
+  row: Row<Quest>,
+  _columnId: string,
+  filterValue: string[],
+) {
+  // Sin selección (chip recién creado o vaciado) no filtra nada — mismo
+  // criterio que el resto de filtros multi-select.
+  if (filterValue.length === 0) return true
+
+  return filterValue.some(
+    (token) => DUE_DATE_FILTER_PREDICATES[token]?.(row.original) ?? false,
+  )
+}
+
+// Filtro "Due date": Overdue, Due soon (hoy..+3 días) y No due date. Vive
+// fuera de `QUEST_FILTERS` porque, igual que Assignee/Supervisor, el caller lo
+// agrega al final para respetar el orden de las columnas de la tabla (la de
+// fecha va casi al final).
+export const DUE_DATE_FILTER: DataTableFilterDef = {
+  id: 'dueDate',
+  columnId: 'dueDate',
+  label: 'Due date',
+  options: [
+    { value: OVERDUE_FILTER_VALUE, label: 'Overdue', icon: CalendarClock },
+    { value: DUE_SOON_FILTER_VALUE, label: 'Due soon', icon: CalendarDays },
+    {
+      value: NO_DUE_DATE_FILTER_VALUE,
+      label: 'No due date',
+      icon: CalendarOff,
+    },
+  ],
+}
 
 // Filtro de asignación (Assignee o Supervisor): sus opciones son los miembros
 // reales del guild (más "Unassigned" para quests sin asignar), no un enum
@@ -520,7 +589,8 @@ export function createQuestsColumns(
       },
     },
 
-    // Due date (editable inline)
+    // Due date (editable inline). El `filterFn` alimenta el filtro "Due date"
+    // (opción Overdue) — ver `DUE_DATE_FILTER`.
     {
       accessorKey: 'dueDate',
       header: () => <ColumnHeader icon={Calendar}>Due Date</ColumnHeader>,
@@ -536,6 +606,7 @@ export function createQuestsColumns(
           />
         )
       },
+      filterFn: dueDateFilterFn,
     },
 
     // Created (solo lectura)

@@ -1,7 +1,7 @@
 // Función de servidor — obtiene el detalle completo de un guild por slug
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
-import { and, asc, count, desc, eq, gte, notInArray } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, lt, notInArray } from 'drizzle-orm'
 
 import { db } from '#/db'
 import { guildMembers, guilds, quests, user } from '#/db/schema'
@@ -63,10 +63,16 @@ export const getGuild = createServerFn({ method: 'GET' })
     )
     inicioSemana.setUTCHours(0, 0, 0, 0)
 
+    // Medianoche UTC de hoy. Las fechas de vencimiento se guardan como
+    // medianoche UTC, así que una quest está vencida si su fecha es
+    // ESTRICTAMENTE anterior a esto — la que vence hoy todavía no cuenta.
+    const inicioDeHoy = new Date()
+    inicioDeHoy.setUTCHours(0, 0, 0, 0)
+
     // Paso 3: stats, miembros y actividad reciente en paralelo
     const [statsResult, membersResult, recentActivityResult] =
       await Promise.all([
-        // Stats: tres conteos de quests
+        // Stats: cuatro conteos de quests
         Promise.all([
           db
             .select({ count: count() })
@@ -94,6 +100,20 @@ export const getGuild = createServerFn({ method: 'GET' })
                 eq(quests.guildId, guild.id),
                 eq(quests.status, 'done'),
                 gte(quests.updatedAt, inicioSemana),
+              ),
+            ),
+          // Vencidas: fecha en el pasado y aún abiertas (misma regla que
+          // `isQuestOverdue` en cliente). `lt` sobre una fecha NULL es NULL en
+          // SQL —descarta las quests sin fecha—, así que no hace falta un
+          // `isNotNull` explícito.
+          db
+            .select({ count: count() })
+            .from(quests)
+            .where(
+              and(
+                eq(quests.guildId, guild.id),
+                lt(quests.dueDate, inicioDeHoy),
+                notInArray(quests.status, ['done', 'cancelled']),
               ),
             ),
         ]),
@@ -128,7 +148,8 @@ export const getGuild = createServerFn({ method: 'GET' })
       ])
 
     // COUNT() siempre devuelve exactamente una fila — desestructuración directa
-    const [[activeRow], [inProgressRow], [completedWeekRow]] = statsResult
+    const [[activeRow], [inProgressRow], [completedWeekRow], [overdueRow]] =
+      statsResult
 
     return {
       // El invite code solo se expone al owner — para el resto de miembros
@@ -139,6 +160,7 @@ export const getGuild = createServerFn({ method: 'GET' })
         activeCount: activeRow.count,
         inProgressCount: inProgressRow.count,
         completedThisWeekCount: completedWeekRow.count,
+        overdueCount: overdueRow.count,
       },
       // Iniciales de respaldo del avatar + retiro del email, vía el helper
       // compartido con `get-quest-guilds`

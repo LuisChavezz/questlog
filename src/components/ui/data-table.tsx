@@ -84,6 +84,18 @@ interface DataTableProps<TData extends RowData, TValue> {
    * (y con qué IDs) según sus propias columnas.
    */
   stickyLeadingColumnIds?: readonly string[]
+  /**
+   * Filtros de columna con los que arranca la tabla — p. ej. el Status
+   * precargado al llegar desde un stat card de Guild Overview vía search
+   * param. Solo se usa como valor SEMILLA de `useState`: es lo que TanStack
+   * Table necesita para que el chip del filtro ya aparezca activo y las filas
+   * ya vengan filtradas en el primer render, sin que el usuario tenga que
+   * reabrir "Add filter" a mano. Cambios posteriores a esta prop NO
+   * resincronizan el estado interno (mismo criterio que cualquier valor
+   * inicial de React) — este componente sigue siendo la única fuente de
+   * verdad de `columnFilters` una vez montado.
+   */
+  initialColumnFilters?: ColumnFiltersState
 }
 
 // Referencia estable para el default de `stickyLeadingColumnIds`: un array
@@ -93,6 +105,9 @@ const NO_STICKY_LEADING_COLUMN_IDS: readonly string[] = []
 
 // Mismo criterio para el default de `filters`: referencia estable.
 const NO_FILTER_DEFS: readonly DataTableFilterDef[] = []
+
+// Mismo criterio para el default de `initialColumnFilters`: referencia estable.
+const NO_INITIAL_COLUMN_FILTERS: ColumnFiltersState = []
 
 interface PersistedColumnSizing {
   columnSizing: ColumnSizingState
@@ -128,16 +143,24 @@ export function DataTable<TData extends RowData, TValue>({
   actions,
   filters = NO_FILTER_DEFS,
   stickyLeadingColumnIds = NO_STICKY_LEADING_COLUMN_IDS,
+  initialColumnFilters = NO_INITIAL_COLUMN_FILTERS,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    [],
-  )
+  const [columnFilters, setColumnFilters] =
+    React.useState<ColumnFiltersState>(initialColumnFilters)
   const [globalFilter, setGlobalFilter] = React.useState('')
   // Sin persistencia entre sesiones (a diferencia del ancho de columnas, que
-  // sí se guarda) — siempre arranca colapsada. Vive aquí (no en el toolbar)
-  // porque también decide el `gap` toolbar-tabla de más abajo.
-  const [filterPanelOpen, setFilterPanelOpen] = React.useState(false)
+  // sí se guarda) — arranca colapsada, EXCEPTO cuando el caller ya sembró un
+  // filtro inicial (p. ej. `?status=...` desde un stat card de Guild
+  // Overview): ahí arranca expandida para que el chip activo sea visible de
+  // inmediato — si no, la tabla aparece silenciosamente pre-filtrada sin
+  // ninguna pista de por qué faltan filas. Solo importa como valor INICIAL de
+  // `useState`; una vez montada, el toggle manual de la toolbar sigue
+  // funcionando igual que siempre. Vive aquí (no en el toolbar) porque
+  // también decide el `gap` toolbar-tabla de más abajo.
+  const [filterPanelOpen, setFilterPanelOpen] = React.useState(
+    () => initialColumnFilters.length > 0,
+  )
   // Con lista vacía no se renderiza barra de filtros NI su toggle en la
   // toolbar — gatear por datos (y no por un nodo, siempre "truthy") es lo que
   // evita un botón de filtros muerto sobre una fila vacía.

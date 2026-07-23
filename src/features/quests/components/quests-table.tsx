@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Row } from '@tanstack/react-table'
+import type { ColumnFiltersState, Row } from '@tanstack/react-table'
 import { Activity, Flag, Swords, Trash2 } from 'lucide-react'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import type { QueryKey } from '@tanstack/react-query'
@@ -35,6 +35,7 @@ import {
   createAssigneeFilterDef,
   createQuestsColumns,
   createSupervisorFilterDef,
+  DUE_DATE_FILTER,
   PRIORITY_OPTIONS,
   QUEST_FILTERS,
   QUEST_TABLE_STICKY_LEADING_COLUMN_IDS,
@@ -84,6 +85,13 @@ interface QuestsTableContentProps {
    * fila de la tabla que el usuario está mirando no se movería.
    */
   questsQueryKey?: QueryKey
+  /**
+   * Filtros de columna con los que la tabla debe arrancar — p. ej. el Status
+   * precargado desde el search param `?status=...` al llegar desde un stat
+   * card de Guild Overview. Pasa a `DataTable` tal cual: solo semilla el
+   * `columnFilters` inicial, ver su prop `initialColumnFilters`.
+   */
+  initialColumnFilters?: ColumnFiltersState
 }
 
 // Componente presentacional reutilizable — acepta quests como prop para que
@@ -93,6 +101,7 @@ export function QuestsTableContent({
   actions,
   guildContext,
   questsQueryKey,
+  initialColumnFilters,
 }: QuestsTableContentProps) {
   const queryClient = useQueryClient()
   // Caché de quests sobre la que operan las mutaciones: la que fije el caller
@@ -248,9 +257,11 @@ export function QuestsTableContent({
     [updateQuest, columnsGuildContext],
   )
 
-  // Assignee solo es filtrable con contexto de guild — sus opciones son los
-  // miembros reales, que la vista personal no tiene. Se agregan después de
-  // Status/Priority, en el mismo orden que las columnas de la tabla.
+  // Orden de los filtros = orden de las columnas de la tabla: Status, Priority,
+  // [Assignee, Supervisor si hay guild], Due date. Assignee/Supervisor solo son
+  // filtrables con contexto de guild (sus opciones son los miembros reales, que
+  // la vista personal no tiene); "Due date" (Overdue) aplica en ambas vistas y
+  // va al final, como su columna.
   const questFilters = useMemo(
     () =>
       guildMembers
@@ -258,8 +269,9 @@ export function QuestsTableContent({
             ...QUEST_FILTERS,
             createAssigneeFilterDef(guildMembers),
             createSupervisorFilterDef(guildMembers),
+            DUE_DATE_FILTER,
           ]
-        : QUEST_FILTERS,
+        : [...QUEST_FILTERS, DUE_DATE_FILTER],
     [guildMembers],
   )
 
@@ -350,6 +362,7 @@ export function QuestsTableContent({
         // y decide toggle/fila/gap mirando `filters.length` — con lista vacía
         // no aparece nada, sin que este caller tenga que gatearlo a mano.
         filters={questFilters}
+        initialColumnFilters={initialColumnFilters}
       />
 
       <ConfirmDialog

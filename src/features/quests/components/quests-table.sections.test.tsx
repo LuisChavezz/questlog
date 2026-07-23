@@ -293,9 +293,10 @@ describe('Quests page — columnas y filtros por origen', () => {
 
     openAddFilterMenu(personal)
 
+    // "Due date" (Overdue) sí aplica en la vista personal; los de asignación no.
     expect(
       (await screen.findAllByRole('menuitem')).map((item) => item.textContent),
-    ).toEqual(['Status', 'Priority'])
+    ).toEqual(['Status', 'Priority', 'Due date'])
   })
 
   it('la tabla de un guild trae el juego completo de columnas y filtros', async () => {
@@ -314,9 +315,10 @@ describe('Quests page — columnas y filtros por origen', () => {
 
     openAddFilterMenu(devGuild)
 
+    // Orden = orden de columnas: Status, Priority, Assignee, Supervisor, Due date.
     expect(
       (await screen.findAllByRole('menuitem')).map((item) => item.textContent),
-    ).toEqual(['Status', 'Priority', 'Assignee', 'Supervisor'])
+    ).toEqual(['Status', 'Priority', 'Assignee', 'Supervisor', 'Due date'])
   })
 
   it('cada toolbar ofrece SOLO los miembros de su propio guild', async () => {
