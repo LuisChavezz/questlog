@@ -1,11 +1,12 @@
 // Función de servidor — obtiene todas las quests de un guild específico
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
-import { and, asc, eq } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 
 import { db } from '#/db'
-import { guildMembers, guilds, quests } from '#/db/schema'
+import { guilds, quests } from '#/db/schema'
 import { auth } from '#/lib/auth'
+import { assertGuildMembershipOrThrow } from './resolve-guild-or-throw'
 import { getGuildInputSchema } from '../schemas/guild-schemas'
 
 export const getGuildQuests = createServerFn({ method: 'GET' })
@@ -31,21 +32,10 @@ export const getGuildQuests = createServerFn({ method: 'GET' })
 
     const guild = guildsFound[0]
 
-    // Paso 2: verificar membresía — puerta de autorización, no filtro de datos
-    const memberships = await db
-      .select({ role: guildMembers.role })
-      .from(guildMembers)
-      .where(
-        and(
-          eq(guildMembers.guildId, guild.id),
-          eq(guildMembers.userId, session.user.id),
-        ),
-      )
-      .limit(1)
-
-    if (memberships.length === 0) {
-      throw new Error('Forbidden: you are not a member of this guild')
-    }
+    // Paso 2: verificar membresía — puerta de autorización compartida, no filtro
+    // de datos (mismo mensaje y criterio que el resto de endpoints del guild). El
+    // rol que devuelve no se usa aquí: esta vista no filtra por rol individual.
+    await assertGuildMembershipOrThrow(guild.id, session.user.id)
 
     // Paso 3: retornar todas las quests del guild sin filtrar por rol individual
     return db

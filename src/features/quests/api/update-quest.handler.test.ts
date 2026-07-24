@@ -6,8 +6,14 @@
 // guild (Axis 1 gestión completa vs. Axis 2 solo-estado).
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { GuildRole } from '#/db/schema'
-import { enqueueSelect, enqueueUpdate, resetDbStub } from '#/test/drizzle-stub'
+import type { GuildRole, QuestStatus } from '#/db/schema'
+import { guildQuestActivityLog } from '#/db/schema'
+import {
+  enqueueSelect,
+  enqueueUpdate,
+  getDbCalls,
+  resetDbStub,
+} from '#/test/drizzle-stub'
 import {
   resolveGuildQuestAuth,
   resolveLockedGuildQuestAuth,
@@ -47,6 +53,13 @@ function setupGuildQuest(opts: {
   creatorRole: GuildRole
   assigneeId?: string | null
   supervisorId?: string | null
+  // Valores PRE-update de los campos rastreados, para las aserciones de la
+  // bitácora (old/new y no-ops). La lectura bloqueada ahora también los lee.
+  currentStatus?: QuestStatus
+  currentDueDate?: Date | null
+  // Miembros extra del guild (rol `member`), para que un cambio de asignado/
+  // supervisor pase la validación de pertenencia.
+  memberIds?: string[]
   expectAllow: boolean
 }) {
   const questRow = {
@@ -54,6 +67,8 @@ function setupGuildQuest(opts: {
     guildId: GUILD,
     assigneeId: opts.assigneeId ?? null,
     supervisorId: opts.supervisorId ?? null,
+    status: opts.currentStatus ?? 'backlog',
+    dueDate: opts.currentDueDate ?? null,
   }
   const ctx = {
     viewer: {
@@ -63,6 +78,7 @@ function setupGuildQuest(opts: {
     },
     roleByUserId: new Map<string, GuildRole>([
       [opts.creatorId, opts.creatorRole],
+      ...(opts.memberIds ?? []).map((id) => [id, 'member'] as const),
     ]),
   }
   vi.mocked(resolveGuildQuestAuth).mockResolvedValue(ctx)
@@ -75,6 +91,13 @@ function setupGuildQuest(opts: {
   }
 
   return updateQuestHandler(opts.data, opts.viewerId)
+}
+
+// Filas escritas en la bitácora de auditoría (inserts contra su tabla).
+function activityLogInserts() {
+  return getDbCalls().filter(
+    (call) => call.op === 'insert' && call.table === guildQuestActivityLog,
+  )
 }
 
 afterEach(() => {
@@ -109,6 +132,18 @@ describe('updateQuestHandler — gate y quest personal', () => {
     enqueueUpdate([updated])
 
     await expect(updateQuestHandler(payload(), USER)).resolves.toEqual(updated)
+  })
+
+  it('actualizar una quest personal NO escribe ninguna fila en la bitácora', async () => {
+    // Ni siquiera un cambio de status —campo que SÍ se auditaría en un guild—
+    // debe registrarse para una quest personal (guildId NULL).
+    enqueueSelect([personalRow(USER)])
+    enqueueSelect([personalRow(USER)])
+    enqueueUpdate([{ id: 'quest-1', ownerId: USER, guildId: null }])
+
+    await updateQuestHandler(payload({ title: undefined, status: 'done' }), USER)
+
+    expect(activityLogInserts()).toHaveLength(0)
   })
 })
 
@@ -270,5 +305,131 @@ describe('updateQuestHandler — modelo de dos ejes de guild', () => {
         expectAllow: false,
       }),
     ).rejects.toThrow('Forbidden: you can only update the status of this quest')
+  })
+})
+
+describe('updateQuestHandler — bitácora de auditoría de guild', () => {
+  it('cambiar el status escribe exactamente una fila `field_updated` con old/new', async () => {
+    await setupGuildQuest({
+      data: payload({ title: undefined, status: 'done' }),
+      viewerId: 'u-creator',
+      viewerRole: 'member',
+      creatorId: 'u-creator',
+      creatorRole: 'member',
+      currentStatus: 'backlog',
+      expectAllow: true,
+    })
+
+    const inserts = activityLogInserts()
+    expect(inserts).toHaveLength(1)
+    expect(inserts[0].values).toEqual([
+      {
+        questId: 'quest-1',
+        guildId: GUILD,
+        actorId: 'u-creator',
+        eventType: 'field_updated',
+        field: 'status',
+        oldValue: 'backlog',
+        newValue: 'done',
+      },
+    ])
+  })
+
+  it('cambiar varios campos rastreados en una llamada escribe una fila por campo', async () => {
+    // status (backlog→done) y dueDate (null→2026-08-01) en el mismo update.
+    await setupGuildQuest({
+      data: payload({ title: undefined, status: 'done', dueDate: '2026-08-01' }),
+      viewerId: 'u-creator',
+      viewerRole: 'member',
+      creatorId: 'u-creator',
+      creatorRole: 'member',
+      currentStatus: 'backlog',
+      currentDueDate: null,
+      expectAllow: true,
+    })
+
+    const inserts = activityLogInserts()
+    expect(inserts).toHaveLength(1)
+    const rows = inserts[0].values as Array<Record<string, unknown>>
+    expect(rows.map((row) => row.field)).toEqual(['status', 'dueDate'])
+    expect(rows[1]).toEqual({
+      questId: 'quest-1',
+      guildId: GUILD,
+      actorId: 'u-creator',
+      eventType: 'field_updated',
+      field: 'dueDate',
+      oldValue: null,
+      newValue: '2026-08-01T00:00:00.000Z',
+    })
+  })
+
+  it('cambiar el asignado escribe una fila `field_updated` de assigneeId', async () => {
+    await setupGuildQuest({
+      data: payload({ title: undefined, assigneeId: 'u-assignee' }),
+      viewerId: 'u-creator',
+      viewerRole: 'member',
+      creatorId: 'u-creator',
+      creatorRole: 'member',
+      assigneeId: null,
+      memberIds: ['u-assignee'],
+      expectAllow: true,
+    })
+
+    const inserts = activityLogInserts()
+    expect(inserts).toHaveLength(1)
+    expect(inserts[0].values).toEqual([
+      {
+        questId: 'quest-1',
+        guildId: GUILD,
+        actorId: 'u-creator',
+        eventType: 'field_updated',
+        field: 'assigneeId',
+        oldValue: null,
+        newValue: 'u-assignee',
+      },
+    ])
+  })
+
+  it('re-enviar el mismo status no escribe ninguna fila (no-op)', async () => {
+    await setupGuildQuest({
+      data: payload({ title: undefined, status: 'todo' }),
+      viewerId: 'u-creator',
+      viewerRole: 'member',
+      creatorId: 'u-creator',
+      creatorRole: 'member',
+      currentStatus: 'todo',
+      expectAllow: true,
+    })
+
+    expect(activityLogInserts()).toHaveLength(0)
+  })
+
+  it('re-enviar la misma dueDate no escribe ninguna fila (no-op de fecha)', async () => {
+    // Mismo día de calendario: el string del payload parsea al MISMO Date
+    // UTC-medianoche que ya está guardado, así que no hay cambio real.
+    await setupGuildQuest({
+      data: payload({ title: undefined, dueDate: '2026-08-01' }),
+      viewerId: 'u-creator',
+      viewerRole: 'member',
+      creatorId: 'u-creator',
+      creatorRole: 'member',
+      currentDueDate: new Date(Date.UTC(2026, 7, 1)),
+      expectAllow: true,
+    })
+
+    expect(activityLogInserts()).toHaveLength(0)
+  })
+
+  it('cambiar solo un campo NO rastreado (priority) no escribe ninguna fila', async () => {
+    await setupGuildQuest({
+      data: payload({ title: undefined, priority: 'high' }),
+      viewerId: 'u-creator',
+      viewerRole: 'member',
+      creatorId: 'u-creator',
+      creatorRole: 'member',
+      expectAllow: true,
+    })
+
+    expect(activityLogInserts()).toHaveLength(0)
   })
 })

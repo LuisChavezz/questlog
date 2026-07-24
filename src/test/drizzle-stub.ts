@@ -33,6 +33,14 @@ export interface DbCall {
   // un select (que recibe la proyección, no la tabla, en su primera llamada).
   table: unknown
   set?: Row
+  // Payload de `.values(...)` en un insert: una fila (objeto) o varias (array).
+  // Permite afirmar sobre lo que un INSERT escribió —p. ej. las filas de la
+  // bitácora de auditoría— sin depender del valor de retorno del handler.
+  values?: unknown
+  // Argumentos de `.orderBy(...)`: uno por clave de orden. Permite afirmar que
+  // una consulta paginada lleva un desempate estable (p. ej. createdAt + id) sin
+  // depender de que el stub —que devuelve las filas tal cual se encolan— ordene.
+  orderBy?: unknown[]
   locked: boolean
   returning: boolean
 }
@@ -43,12 +51,14 @@ interface Chain {
   from: (table?: unknown) => Chain
   where: (condition?: unknown) => Chain
   limit: (count?: number) => Chain
+  offset: (count?: number) => Chain
   for: (strength?: string) => Chain
   set: (values?: Row) => Chain
   values: (rows?: unknown) => Chain
   returning: (projection?: unknown) => Chain
-  orderBy: (order?: unknown) => Chain
+  orderBy: (...order: unknown[]) => Chain
   innerJoin: (table?: unknown, on?: unknown) => Chain
+  leftJoin: (table?: unknown, on?: unknown) => Chain
   then: (
     onF: (v: Row[]) => unknown,
     onR?: (e: unknown) => unknown,
@@ -82,6 +92,7 @@ function makeChain(call: DbCall, resolve: () => Row[]): Chain {
     },
     where: () => chain,
     limit: () => chain,
+    offset: () => chain,
     for: () => {
       call.locked = true
       return chain
@@ -90,13 +101,20 @@ function makeChain(call: DbCall, resolve: () => Row[]): Chain {
       call.set = values
       return chain
     },
-    values: () => chain,
+    values: (values) => {
+      call.values = values
+      return chain
+    },
     returning: () => {
       call.returning = true
       return chain
     },
-    orderBy: () => chain,
+    orderBy: (...order) => {
+      call.orderBy = order
+      return chain
+    },
     innerJoin: () => chain,
+    leftJoin: () => chain,
     then: (onF, onR) => Promise.resolve(resolve()).then(onF, onR),
   }
   return chain

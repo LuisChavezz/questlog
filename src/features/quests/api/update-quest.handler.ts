@@ -10,7 +10,8 @@
 import { and, eq } from 'drizzle-orm'
 
 import { db } from '#/db'
-import { quests } from '#/db/schema'
+import { guildQuestActivityLog, quests } from '#/db/schema'
+import type { NewGuildQuestActivityLog } from '#/db/schema'
 import {
   canManageGuildQuest,
   canUpdateGuildQuestStatus,
@@ -21,6 +22,7 @@ import {
 } from '#/features/guilds/api/resolve-guild-quest-auth'
 import { parseQuestDueDateValue } from '../schemas/quest-schemas'
 import type { UpdateQuestValues } from '../schemas/quest-schemas'
+import { computeGuildQuestFieldChanges } from './guild-quest-activity-log'
 
 export async function updateQuestHandler(
   data: UpdateQuestValues,
@@ -168,6 +170,11 @@ export async function updateQuestHandler(
         guildId: quests.guildId,
         assigneeId: quests.assigneeId,
         supervisorId: quests.supervisorId,
+        // status y dueDate se leen aquí —dentro del mismo SELECT ... FOR UPDATE
+        // que ya congela la fila para la reverificación— para tener los valores
+        // PRE-update de la auditoría sin una lectura extra ni una carrera TOCTOU.
+        status: quests.status,
+        dueDate: quests.dueDate,
       })
       .from(quests)
       .where(eq(quests.id, data.id))
@@ -250,6 +257,39 @@ export async function updateQuestHandler(
       throw new Error(
         'Conflict: the quest changed while updating — please refresh and try again',
       )
+    }
+
+    // Auditoría: solo quests de guild. Una fila `field_updated` por cada campo
+    // rastreado que CAMBIÓ de verdad (los no-ops no generan fila), en la MISMA
+    // transacción que el UPDATE. Los `oldValue` salen de `locked` (estado
+    // pre-update bloqueado); una quest personal (`locked.guildId` NULL) nunca
+    // entra aquí.
+    if (locked.guildId) {
+      const guildId = locked.guildId
+      const changes = computeGuildQuestFieldChanges(
+        {
+          status: locked.status,
+          assigneeId: locked.assigneeId,
+          supervisorId: locked.supervisorId,
+          dueDate: locked.dueDate,
+        },
+        data,
+      )
+      if (changes.length > 0) {
+        await tx.insert(guildQuestActivityLog).values(
+          changes.map(
+            (change): NewGuildQuestActivityLog => ({
+              questId: data.id,
+              guildId,
+              actorId: userId,
+              eventType: 'field_updated',
+              field: change.field,
+              oldValue: change.oldValue,
+              newValue: change.newValue,
+            }),
+          ),
+        )
+      }
     }
 
     return updated[0]

@@ -5,7 +5,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { GuildRole } from '#/db/schema'
-import { enqueueDelete, enqueueSelect, resetDbStub } from '#/test/drizzle-stub'
+import { guildQuestActivityLog, quests } from '#/db/schema'
+import {
+  enqueueDelete,
+  enqueueSelect,
+  getDbCalls,
+  resetDbStub,
+} from '#/test/drizzle-stub'
 import {
   resolveGuildQuestAuth,
   resolveLockedGuildQuestAuth,
@@ -113,5 +119,31 @@ describe('deleteQuestsHandler — lote de guild', () => {
     ).rejects.toThrow(
       'Forbidden: you do not have permission to delete one or more of the selected quests',
     )
+  })
+
+  it('borrar un lote de guild no escribe en la bitácora y usa un DELETE estándar', async () => {
+    const rows = [guildQuest('q1', 'u-m1'), guildQuest('q2', 'u-m2')]
+    const ctx = guildCtx('admin', { 'u-m1': 'member', 'u-m2': 'member' })
+    vi.mocked(resolveGuildQuestAuth).mockResolvedValue(ctx)
+    vi.mocked(resolveLockedGuildQuestAuth).mockResolvedValue(ctx)
+
+    enqueueSelect(rows)
+    enqueueSelect(rows)
+    enqueueDelete(rows)
+
+    await deleteQuestsHandler({ ids: ['q1', 'q2'] }, 'u-officer')
+
+    const calls = getDbCalls()
+    // El borrado múltiple tampoco registra ningún evento.
+    expect(
+      calls.filter(
+        (call) => call.op === 'insert' && call.table === guildQuestActivityLog,
+      ),
+    ).toHaveLength(0)
+    // DELETE de filas estándar sobre `quests`: el FK ON DELETE CASCADE limpia la
+    // bitácora del lado de la BD, sin que el handler tenga que tocarla.
+    expect(
+      calls.some((call) => call.op === 'delete' && call.table === quests),
+    ).toBe(true)
   })
 })

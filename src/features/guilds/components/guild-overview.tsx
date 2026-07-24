@@ -1,53 +1,31 @@
-import { Link, useParams } from '@tanstack/react-router'
+import { Link, useParams, useRouteContext } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, CheckCircle2, Clock, Pencil, Plus } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 
 import { AvatarGroup, AvatarGroupCount } from '#/components/ui/avatar'
 import { UserAvatar } from '#/components/user-avatar'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
 import { cn } from '#/lib/utils'
 import { guildQueryOptions } from '../api/guild-query-options'
-import type { GuildDetail } from '../api/get-guild'
-
-type QuestStatus = GuildDetail['recentActivity'][number]['status']
-
-const STATUS_ICON: Record<QuestStatus, LucideIcon> = {
-  done: CheckCircle2,
-  in_progress: Clock,
-  backlog: Plus,
-  todo: Plus,
-  cancelled: Pencil,
-}
-
-const STATUS_LABEL: Record<QuestStatus, string> = {
-  done: 'Completed',
-  in_progress: 'In Progress',
-  backlog: 'Added',
-  todo: 'Added',
-  cancelled: 'Cancelled',
-}
-
-// Tiempo relativo legible sin librería externa
-function getRelativeTime(date: Date | string): string {
-  const diff = Date.now() - new Date(date).getTime()
-  const minutes = Math.floor(diff / 60_000)
-  if (minutes < 60) return minutes <= 1 ? 'just now' : `${minutes} minutes ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`
-  const days = Math.floor(hours / 24)
-  if (days === 1) return 'yesterday'
-  if (days < 7) return `${days} days ago`
-  const weeks = Math.floor(days / 7)
-  return weeks === 1 ? '1 week ago' : `${weeks} weeks ago`
-}
+import { GuildRecentActivityCard } from './guild-recent-activity-card'
+import { useGuildActivityDrawer } from './use-guild-activity-drawer'
 
 // Número máximo de avatares visibles antes del contador "+N"
 const MAX_VISIBLE_MEMBERS = 5
 
 export function GuildOverview() {
   const { slug } = useParams({ from: '/_app/guilds/$slug/' })
+  const { session } = useRouteContext({ from: '/_app/guilds/$slug/' })
   const { data, isError } = useQuery(guildQueryOptions(slug))
+
+  // Drawer de detalle de quest, compartido por la tarjeta y el modal de
+  // actividad (ambos enlazan a él vía `openQuest`). Se declara antes del early
+  // return de error para no romper el orden de hooks.
+  const { openQuest, drawer } = useGuildActivityDrawer(
+    slug,
+    session.user.id,
+    data,
+  )
 
   if (isError) {
     return (
@@ -98,8 +76,6 @@ export function GuildOverview() {
   const members = data?.members ?? []
   const visibleMembers = members.slice(0, MAX_VISIBLE_MEMBERS)
   const extraCount = Math.max(0, members.length - MAX_VISIBLE_MEMBERS)
-
-  const recentActivity = data?.recentActivity ?? []
 
   return (
     <div className="flex flex-col gap-6 p-8">
@@ -210,40 +186,18 @@ export function GuildOverview() {
           </Card>
         </Link>
 
-        {/* Actividad reciente */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            {recentActivity.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No recent activity.
-              </p>
-            ) : (
-              recentActivity.map((item) => {
-                const Icon = STATUS_ICON[item.status]
-                return (
-                  <div key={item.id} className="flex items-center gap-3">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                      <Icon size={13} aria-hidden="true" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {item.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {STATUS_LABEL[item.status]} ·{' '}
-                        {getRelativeTime(item.updatedAt)}
-                      </p>
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </CardContent>
-        </Card>
+        {/* Actividad reciente — datos reales de guild_quest_activity_log */}
+        <GuildRecentActivityCard
+          slug={slug}
+          members={members}
+          onOpenQuest={openQuest}
+        />
       </div>
+
+      {/* Drawer de detalle: se abre al hacer clic en una quest de la actividad
+          (desde la tarjeta o el modal). Es un overlay no modal que convive con
+          el Overview. */}
+      {drawer}
     </div>
   )
 }

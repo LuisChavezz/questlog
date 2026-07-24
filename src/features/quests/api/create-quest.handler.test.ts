@@ -5,7 +5,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { GuildRole } from '#/db/schema'
-import { enqueueInsert, resetDbStub } from '#/test/drizzle-stub'
+import { guildQuestActivityLog } from '#/db/schema'
+import { enqueueInsert, getDbCalls, resetDbStub } from '#/test/drizzle-stub'
 import {
   resolveGuildQuestAuth,
   resolveLockedGuildQuestAuth,
@@ -65,6 +66,13 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
+// Filas escritas en la bitácora de auditoría (inserts contra su tabla).
+function activityLogInserts() {
+  return getDbCalls().filter(
+    (call) => call.op === 'insert' && call.table === guildQuestActivityLog,
+  )
+}
+
 describe('createQuestHandler — quest personal', () => {
   it('crea e inserta una quest personal', async () => {
     const inserted = { id: 'new-quest', title: 'Quest', guildId: null }
@@ -73,6 +81,14 @@ describe('createQuestHandler — quest personal', () => {
     await expect(createQuestHandler(createData(), 'user-1')).resolves.toEqual(
       inserted,
     )
+  })
+
+  it('una quest personal NO escribe ninguna fila en la bitácora', async () => {
+    enqueueInsert([{ id: 'new-quest', title: 'Quest', guildId: null }])
+
+    await createQuestHandler(createData(), 'user-1')
+
+    expect(activityLogInserts()).toHaveLength(0)
   })
 })
 
@@ -146,5 +162,24 @@ describe('createQuestHandler — quest de guild', () => {
         expectAllow: true,
       }),
     ).resolves.toBeDefined()
+  })
+
+  it('escribe exactamente una fila `created` con questId/guildId/actorId correctos', async () => {
+    await setupGuildCreate({
+      data: createData({ guildId: GUILD }),
+      viewerId: GM,
+      viewerRole: 'owner',
+      expectAllow: true,
+    })
+
+    const inserts = activityLogInserts()
+    expect(inserts).toHaveLength(1)
+    // `id: 'new-quest'` es lo que devuelve el INSERT encolado por setupGuildCreate.
+    expect(inserts[0].values).toEqual({
+      questId: 'new-quest',
+      guildId: GUILD,
+      actorId: GM,
+      eventType: 'created',
+    })
   })
 })

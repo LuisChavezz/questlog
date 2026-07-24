@@ -4,7 +4,7 @@
 // supervisor, transacción con reverificación bloqueada) es idéntico al que tenía
 // inline en el handler.
 import { db } from '#/db'
-import { quests } from '#/db/schema'
+import { guildQuestActivityLog, quests } from '#/db/schema'
 import type { NewQuest } from '#/db/schema'
 import { canCreateGuildQuest } from '#/features/guilds/role-labels'
 import {
@@ -116,6 +116,18 @@ export async function createQuestHandler(
     }
 
     const [quest] = await tx.insert(quests).values(questValues).returning()
+
+    // Auditoría: una quest de guild recién creada deja una fila `created` en la
+    // MISMA transacción que su INSERT (o ambas cuajan, o ninguna). Solo se llega
+    // aquí en la rama de guild —la personal retornó antes—, así que este log
+    // nunca se escribe para quests personales. field/oldValue/newValue quedan
+    // NULL: el evento `created` no describe el cambio de un campo.
+    await tx.insert(guildQuestActivityLog).values({
+      questId: quest.id,
+      guildId,
+      actorId: userId,
+      eventType: 'created',
+    })
 
     return quest
   })

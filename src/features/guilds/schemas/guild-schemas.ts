@@ -69,6 +69,22 @@ export const getGuildInputSchema = z.object({
   slug: guildSlugSchema,
 })
 
+// ─── Esquema del historial de actividad (paginado) ────────────────────────────
+
+/**
+ * Entrada del historial de actividad de un guild. `page` es 0-based; el tamaño
+ * de página lo fija el servidor (`GUILD_ACTIVITY_PAGE_SIZE`). El detalle reciente
+ * (tarjeta, top 5) reutiliza `getGuildInputSchema` porque solo necesita el slug.
+ */
+export const getGuildActivityHistorySchema = z.object({
+  slug: guildSlugSchema,
+  page: z.number().int().min(0),
+})
+
+export type GetGuildActivityHistoryValues = z.infer<
+  typeof getGuildActivityHistorySchema
+>
+
 // ─── Esquema de regeneración de invite code ───────────────────────────────────
 
 /** Esquema de entrada para regenerar el invite code de un guild */

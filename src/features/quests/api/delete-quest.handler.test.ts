@@ -4,8 +4,16 @@
 // mockeado por el stub; los resolvers de auth mockeados.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { getTableConfig } from 'drizzle-orm/pg-core'
+
 import type { GuildRole } from '#/db/schema'
-import { enqueueDelete, enqueueSelect, resetDbStub } from '#/test/drizzle-stub'
+import { guildQuestActivityLog, quests } from '#/db/schema'
+import {
+  enqueueDelete,
+  enqueueSelect,
+  getDbCalls,
+  resetDbStub,
+} from '#/test/drizzle-stub'
 import {
   resolveGuildQuestAuth,
   resolveLockedGuildQuestAuth,
@@ -146,5 +154,40 @@ describe('deleteQuestHandler — quest de guild (eje 1)', () => {
     ).rejects.toThrow(
       'Forbidden: you do not have permission to delete this quest',
     )
+  })
+})
+
+describe('deleteQuestHandler — bitácora de auditoría y cascada', () => {
+  it('borrar una quest de guild no escribe en la bitácora y usa un DELETE estándar', async () => {
+    await setupGuildDelete({
+      viewerId: GM,
+      viewerRole: 'owner',
+      creatorId: 'u-member',
+      creatorRole: 'member',
+      expectAllow: true,
+    })
+
+    const calls = getDbCalls()
+    // El borrado NO registra ningún evento (no hay evento de borrado).
+    expect(
+      calls.filter(
+        (call) => call.op === 'insert' && call.table === guildQuestActivityLog,
+      ),
+    ).toHaveLength(0)
+    // Es un DELETE de filas estándar sobre `quests` (no SQL crudo), así que el
+    // FK ON DELETE CASCADE limpia las filas de bitácora del lado de la BD.
+    expect(
+      calls.some((call) => call.op === 'delete' && call.table === quests),
+    ).toBe(true)
+  })
+
+  it('la FK `quest_id` de la bitácora está declarada ON DELETE CASCADE', () => {
+    // Verificación estructural de la cascada que borra la historia junto con la
+    // quest — la garantía real que sustituye a cualquier evento de borrado.
+    const { foreignKeys } = getTableConfig(guildQuestActivityLog)
+    const questFk = foreignKeys.find((fk) =>
+      fk.reference().columns.some((col) => col.name === 'quest_id'),
+    )
+    expect(questFk?.onDelete).toBe('cascade')
   })
 })

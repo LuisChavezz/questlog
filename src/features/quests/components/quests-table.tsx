@@ -16,21 +16,18 @@ import { DataTable } from '#/components/ui/data-table'
 import type { DataTableBulkAction } from '#/components/ui/data-table-bulk-actions'
 import type { Quest, QuestPriority, QuestStatus, GuildRole } from '#/db/schema'
 import {
-  canManageGuildQuest,
-  canUpdateGuildQuestStatus,
-} from '#/features/guilds/role-labels'
-import type { GuildMemberViewer } from '#/features/guilds/role-labels'
-import {
   questGuildsQueryOptions,
   questsQueryOptions,
   QUEST_GUILDS_QUERY_KEY,
   QUESTS_QUERY_KEY,
 } from '../api/quests-query-options'
+import { invalidateGuildQuestCaches } from '../api/invalidate-guild-quest-caches'
 import type { UpdateQuestValues } from '../schemas/quest-schemas'
 import { useBulkDeleteQuests } from '../hooks/use-bulk-delete-quests'
 import { useBulkUpdateQuests } from '../hooks/use-bulk-update-quests'
 import { useDeleteQuest } from '../hooks/use-delete-quest'
 import { useUpdateQuest } from '../hooks/use-update-quest'
+import { useQuestsColumnsGuildContext } from '../hooks/use-quests-columns-guild-context'
 import {
   createAssigneeFilterDef,
   createQuestsColumns,
@@ -128,11 +125,9 @@ export function QuestsTableContent({
   const invalidateRelatedCaches = useCallback(() => {
     if (!guildSlug) return
 
-    queryClient.invalidateQueries({ queryKey: ['guild', guildSlug] })
-
-    if (invalidatesPersonalQuests) {
-      queryClient.invalidateQueries({ queryKey: QUESTS_QUERY_KEY })
-    }
+    invalidateGuildQuestCaches(queryClient, guildSlug, {
+      includePersonalQuests: invalidatesPersonalQuests,
+    })
   }, [queryClient, guildSlug, invalidatesPersonalQuests])
 
   // Edición inline de campos: en un guild opera sobre su caché de quests para
@@ -150,19 +145,6 @@ export function QuestsTableContent({
   const { mutateAsync: bulkDeleteQuests } =
     useBulkDeleteQuests(mutationsQueryKey)
   const { mutateAsync: deleteQuest } = useDeleteQuest(mutationsQueryKey)
-  // Reasignar asignado/supervisor es solo otra edición de campo: se enruta por
-  // el mismo `updateQuest` (misma caché optimista y misma invalidación del
-  // detalle del guild) en vez de un hook aparte que reimplemente el patrón.
-  const updateAssignment = useCallback(
-    (input: {
-      id: string
-      field: 'assigneeId' | 'supervisorId'
-      userId: string | null
-    }) => {
-      updateQuest({ id: input.id, [input.field]: input.userId })
-    },
-    [updateQuest],
-  )
 
   // Eliminación seleccionada pendiente de confirmación (null = diálogo cerrado)
   const [pendingDeletion, setPendingDeletion] =
@@ -194,59 +176,13 @@ export function QuestsTableContent({
     clearSelection()
   }
 
-  // Memoizar columnas para evitar recreaciones innecesarias.
-  // updateQuest y updateAssignment de useMutation son referencias estables;
-  // los campos del guild provienen de la query y son estables entre renders.
+  // Contexto de columnas (miembros + reasignación + permisos por quest) derivado
+  // del contexto de guild de la tabla — hook compartido con el host del drawer
+  // del Overview, para no reimplementar el ensamblado de permisos dos veces.
   const guildMembers = guildContext?.members
-  const guildCurrentUserId = guildContext?.currentUserId
-  const guildCurrentUserRole = guildContext?.currentUserRole
-  const guildOwnerId = guildContext?.guildOwnerId
-
-  // Predicados de permiso derivados del contexto de guild — misma lógica de dos
-  // ejes que el servidor (role-labels). El rol del creador de cada quest se
-  // resuelve contra los miembros del guild.
-  const guildAuth = useMemo(() => {
-    if (
-      !guildMembers ||
-      !guildCurrentUserId ||
-      !guildCurrentUserRole ||
-      !guildOwnerId
-    ) {
-      return null
-    }
-
-    const viewer: GuildMemberViewer = {
-      viewerId: guildCurrentUserId,
-      viewerRole: guildCurrentUserRole,
-      ownerId: guildOwnerId,
-    }
-    const roleByUserId = new Map(guildMembers.map((m) => [m.userId, m.role]))
-    const targetOf = (quest: Quest) => ({
-      creatorId: quest.ownerId,
-      creatorRole: roleByUserId.get(quest.ownerId) ?? null,
-      assigneeId: quest.assigneeId,
-      supervisorId: quest.supervisorId,
-    })
-
-    return {
-      canManageQuest: (quest: Quest) =>
-        canManageGuildQuest(viewer, targetOf(quest)),
-      canUpdateQuestStatus: (quest: Quest) =>
-        canUpdateGuildQuestStatus(viewer, targetOf(quest)),
-    }
-  }, [guildMembers, guildCurrentUserId, guildCurrentUserRole, guildOwnerId])
-
-  const columnsGuildContext = useMemo(
-    () =>
-      guildMembers && guildAuth
-        ? {
-            members: guildMembers,
-            onAssignmentChange: updateAssignment,
-            canManageQuest: guildAuth.canManageQuest,
-            canUpdateQuestStatus: guildAuth.canUpdateQuestStatus,
-          }
-        : undefined,
-    [guildMembers, guildAuth, updateAssignment],
+  const columnsGuildContext = useQuestsColumnsGuildContext(
+    guildContext,
+    updateQuest,
   )
 
   const columns = useMemo(
@@ -276,9 +212,9 @@ export function QuestsTableContent({
   )
 
   // Solo se pueden seleccionar (para acciones masivas) las quests gestionables.
-  // En la vista personal (sin guildAuth) se seleccionan todas.
-  const enableRowSelection = guildAuth
-    ? (row: Row<Quest>) => guildAuth.canManageQuest(row.original)
+  // En la vista personal (sin contexto de guild) se seleccionan todas.
+  const enableRowSelection = columnsGuildContext
+    ? (row: Row<Quest>) => columnsGuildContext.canManageQuest(row.original)
     : true
   const bulkActions = useMemo<DataTableBulkAction<Quest>[]>(
     () => [

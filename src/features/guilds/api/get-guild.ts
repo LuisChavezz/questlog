@@ -1,11 +1,12 @@
 // Función de servidor — obtiene el detalle completo de un guild por slug
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
-import { and, asc, count, desc, eq, gte, lt, notInArray } from 'drizzle-orm'
+import { and, asc, count, eq, gte, lt, notInArray } from 'drizzle-orm'
 
 import { db } from '#/db'
 import { guildMembers, guilds, quests, user } from '#/db/schema'
 import { auth } from '#/lib/auth'
+import { assertGuildMembershipOrThrow } from './resolve-guild-or-throw'
 import { toMemberWithInitials } from './member-shaping'
 import { isGuildOwner } from '../role-labels'
 import { getGuildInputSchema } from '../schemas/guild-schemas'
@@ -33,23 +34,14 @@ export const getGuild = createServerFn({ method: 'GET' })
 
     const guild = guildsFound[0]
 
-    // Paso 2: verificar membresía y obtener rol del usuario actual
-    const memberships = await db
-      .select({ role: guildMembers.role })
-      .from(guildMembers)
-      .where(
-        and(
-          eq(guildMembers.guildId, guild.id),
-          eq(guildMembers.userId, session.user.id),
-        ),
-      )
-      .limit(1)
-
-    if (memberships.length === 0) {
-      throw new Error('Forbidden: you are not a member of this guild')
-    }
-
-    const { role: currentUserRole } = memberships[0]
+    // Paso 2: verificar membresía y obtener el rol del usuario actual — puerta de
+    // autorización compartida (misma consulta, mensaje y criterio que el resto de
+    // endpoints de lectura del guild). Se aprovecha su valor de retorno para el
+    // `currentUserRole` sin una segunda consulta.
+    const { role: currentUserRole } = await assertGuildMembershipOrThrow(
+      guild.id,
+      session.user.id,
+    )
 
     // Dueño estructural (guilds.owner_id), no el rol — mismo criterio que
     // transfer-guild-ownership.ts / leave-guild.ts, para no depender de un
@@ -69,83 +61,69 @@ export const getGuild = createServerFn({ method: 'GET' })
     const inicioDeHoy = new Date()
     inicioDeHoy.setUTCHours(0, 0, 0, 0)
 
-    // Paso 3: stats, miembros y actividad reciente en paralelo
-    const [statsResult, membersResult, recentActivityResult] =
-      await Promise.all([
-        // Stats: cuatro conteos de quests
-        Promise.all([
-          db
-            .select({ count: count() })
-            .from(quests)
-            .where(
-              and(
-                eq(quests.guildId, guild.id),
-                notInArray(quests.status, ['done', 'cancelled']),
-              ),
-            ),
-          db
-            .select({ count: count() })
-            .from(quests)
-            .where(
-              and(
-                eq(quests.guildId, guild.id),
-                eq(quests.status, 'in_progress'),
-              ),
-            ),
-          db
-            .select({ count: count() })
-            .from(quests)
-            .where(
-              and(
-                eq(quests.guildId, guild.id),
-                eq(quests.status, 'done'),
-                gte(quests.updatedAt, inicioSemana),
-              ),
-            ),
-          // Vencidas: fecha en el pasado y aún abiertas (misma regla que
-          // `isQuestOverdue` en cliente). `lt` sobre una fecha NULL es NULL en
-          // SQL —descarta las quests sin fecha—, así que no hace falta un
-          // `isNotNull` explícito.
-          db
-            .select({ count: count() })
-            .from(quests)
-            .where(
-              and(
-                eq(quests.guildId, guild.id),
-                lt(quests.dueDate, inicioDeHoy),
-                notInArray(quests.status, ['done', 'cancelled']),
-              ),
-            ),
-        ]),
-        // Miembros: guild_members JOIN users
+    // Paso 3: stats y miembros en paralelo. La actividad reciente ya NO vive
+    // aquí: la tarjeta del Overview la obtiene de `guild_quest_activity_log` vía
+    // su propia server fn (get-guild-recent-activity), no derivada de quests.
+    const [statsResult, membersResult] = await Promise.all([
+      // Stats: cuatro conteos de quests
+      Promise.all([
         db
-          .select({
-            id: guildMembers.id,
-            userId: guildMembers.userId,
-            name: user.name,
-            email: user.email,
-            image: user.image,
-            avatarId: user.avatarId,
-            role: guildMembers.role,
-            joinedAt: guildMembers.joinedAt,
-          })
-          .from(guildMembers)
-          .innerJoin(user, eq(guildMembers.userId, user.id))
-          .where(eq(guildMembers.guildId, guild.id))
-          .orderBy(asc(guildMembers.joinedAt)),
-        // Actividad reciente: últimas 5 quests ordenadas por fecha de actualización
-        db
-          .select({
-            id: quests.id,
-            title: quests.title,
-            status: quests.status,
-            updatedAt: quests.updatedAt,
-          })
+          .select({ count: count() })
           .from(quests)
-          .where(eq(quests.guildId, guild.id))
-          .orderBy(desc(quests.updatedAt))
-          .limit(5),
-      ])
+          .where(
+            and(
+              eq(quests.guildId, guild.id),
+              notInArray(quests.status, ['done', 'cancelled']),
+            ),
+          ),
+        db
+          .select({ count: count() })
+          .from(quests)
+          .where(
+            and(eq(quests.guildId, guild.id), eq(quests.status, 'in_progress')),
+          ),
+        db
+          .select({ count: count() })
+          .from(quests)
+          .where(
+            and(
+              eq(quests.guildId, guild.id),
+              eq(quests.status, 'done'),
+              gte(quests.updatedAt, inicioSemana),
+            ),
+          ),
+        // Vencidas: fecha en el pasado y aún abiertas (misma regla que
+        // `isQuestOverdue` en cliente). `lt` sobre una fecha NULL es NULL en
+        // SQL —descarta las quests sin fecha—, así que no hace falta un
+        // `isNotNull` explícito.
+        db
+          .select({ count: count() })
+          .from(quests)
+          .where(
+            and(
+              eq(quests.guildId, guild.id),
+              lt(quests.dueDate, inicioDeHoy),
+              notInArray(quests.status, ['done', 'cancelled']),
+            ),
+          ),
+      ]),
+      // Miembros: guild_members JOIN users
+      db
+        .select({
+          id: guildMembers.id,
+          userId: guildMembers.userId,
+          name: user.name,
+          email: user.email,
+          image: user.image,
+          avatarId: user.avatarId,
+          role: guildMembers.role,
+          joinedAt: guildMembers.joinedAt,
+        })
+        .from(guildMembers)
+        .innerJoin(user, eq(guildMembers.userId, user.id))
+        .where(eq(guildMembers.guildId, guild.id))
+        .orderBy(asc(guildMembers.joinedAt)),
+    ])
 
     // COUNT() siempre devuelve exactamente una fila — desestructuración directa
     const [[activeRow], [inProgressRow], [completedWeekRow], [overdueRow]] =
@@ -165,7 +143,6 @@ export const getGuild = createServerFn({ method: 'GET' })
       // Iniciales de respaldo del avatar + retiro del email, vía el helper
       // compartido con `get-quest-guilds`
       members: membersResult.map(toMemberWithInitials),
-      recentActivity: recentActivityResult,
     }
   })
 
