@@ -22,6 +22,7 @@ export const getGuilds = createServerFn({ method: 'GET' }).handler(async () => {
       name: guilds.name,
       slug: guilds.slug,
       description: guilds.description,
+      coatOfArmsSvg: guilds.coatOfArmsSvg,
       ownerId: guilds.ownerId,
       createdAt: guilds.createdAt,
       updatedAt: guilds.updatedAt,

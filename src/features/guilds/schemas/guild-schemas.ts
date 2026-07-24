@@ -76,6 +76,17 @@ export const regenerateInviteCodeSchema = z.object({
   guildId: z.string().min(1),
 })
 
+// ─── Esquema de regeneración de escudo de armas ───────────────────────────────
+
+/** Esquema de entrada para regenerar (o generar por primera vez) el escudo de armas de un guild */
+export const regenerateCoatOfArmsSchema = z.object({
+  slug: guildSlugSchema,
+})
+
+export type RegenerateCoatOfArmsValues = z.infer<
+  typeof regenerateCoatOfArmsSchema
+>
+
 // ─── Esquemas de invitación (preview público + unirse) ─────────────────────────
 
 /** Código de invitación: cadena no vacía. La validez real se verifica en la DB. */

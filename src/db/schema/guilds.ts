@@ -17,6 +17,14 @@ export const guilds = pgTable('guilds', {
   // código de invitación corto, generado automáticamente al crear el guild
   inviteCode: text('invite_code').notNull().unique(),
   description: text('description'),
+  // Seed determinístico (= id del guild) usado para generar el escudo de
+  // armas vía la Armoria API — se guarda aunque coatOfArmsSvg falle, para
+  // poder reintentar la generación más adelante sin perder el resultado esperado.
+  coatOfArmsSeed: text('coat_of_arms_seed'),
+  // SVG del escudo de armas, generado una sola vez al crear el guild y
+  // persistido aquí — la app nunca depende de la Armoria API después de la
+  // creación (ver CLAUDE.md / decisión de Path B sobre disponibilidad del servicio).
+  coatOfArmsSvg: text('coat_of_arms_svg'),
   // dueño/fundador del guild — se replica la convención de cascada de quests
   ownerId: text('owner_id')
     .notNull()

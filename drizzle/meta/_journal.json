@@ -71,6 +71,13 @@
       "when": 1782941092433,
       "tag": "0009_safe_newton_destine",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784843080692,
+      "tag": "0010_milky_preak",
+      "breakpoints": true
     }
   ]
 }

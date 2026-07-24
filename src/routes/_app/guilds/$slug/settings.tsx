@@ -10,9 +10,12 @@ import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { regenerateInviteCode } from '#/features/guilds/api/regenerate-invite-code'
 import { guildQueryOptions } from '#/features/guilds/api/guild-query-options'
+import { GuildCoatOfArms } from '#/features/guilds/components/guild-coat-of-arms'
 import { useLeaveGuild } from '#/features/guilds/hooks/use-leave-guild'
+import { useRegenerateCoatOfArms } from '#/features/guilds/hooks/use-regenerate-coat-of-arms'
 import { isGuildOwner } from '#/features/guilds/role-labels'
 import { getInviteUrl } from '#/features/guilds/schemas/guild-schemas'
+import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/guilds/$slug/settings')({
   // Sin guard de owner: la membresía ya la garantiza el loader del layout padre
@@ -32,6 +35,7 @@ function GuildSettingsPage() {
   const [copiedLink, setCopiedLink] = useState(false)
 
   const leaveGuild = useLeaveGuild(slug, () => setLeaveOpen(false))
+  const regenerateCoatOfArms = useRegenerateCoatOfArms(slug)
 
   // Owner estructural (guilds.owner_id) — decide qué secciones se muestran
   const isOwner = data
@@ -71,6 +75,58 @@ function GuildSettingsPage() {
             : 'Manage your guild membership.'}
         </p>
       </div>
+
+      {/* Sección de escudo de armas — solo el owner puede re-rolarlo. Sirve
+          tanto para regenerar uno existente como para generar el primero en
+          guilds creados antes de esta feature (coatOfArmsSvg null): es la
+          misma operación, no hay botón separado para "primera vez". */}
+      {isOwner && (
+        <section className="flex flex-col gap-3">
+          <h3 className="text-sm font-medium text-foreground">Coat of Arms</h3>
+          <div className="flex items-center gap-4">
+            {data?.guild.coatOfArmsSvg ? (
+              // Escudo real: sin caja de fondo — mismo criterio que
+              // guild-detail-header.tsx (la ilustración ya trae su propio
+              // borde heráldico, a diferencia del ícono genérico de abajo)
+              <GuildCoatOfArms
+                svg={data.guild.coatOfArmsSvg}
+                className="h-16 w-16 shrink-0 object-contain"
+                emblemClassName="h-8 w-8"
+              />
+            ) : (
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <GuildCoatOfArms svg={null} emblemClassName="h-8 w-8" />
+              </div>
+            )}
+            <div className="flex flex-col gap-1.5">
+              <Button
+                variant="outline"
+                className="w-fit"
+                onClick={() => regenerateCoatOfArms.mutate()}
+                disabled={regenerateCoatOfArms.isPending}
+              >
+                <RefreshCw
+                  size={15}
+                  className={cn(
+                    'mr-2',
+                    regenerateCoatOfArms.isPending && 'animate-spin',
+                  )}
+                />
+                {regenerateCoatOfArms.isPending
+                  ? 'Generating…'
+                  : 'Regenerate Coat of Arms'}
+              </Button>
+              {regenerateCoatOfArms.error && (
+                <p className="text-xs text-destructive">
+                  {regenerateCoatOfArms.error instanceof Error
+                    ? regenerateCoatOfArms.error.message
+                    : 'Something went wrong. Please try again.'}
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Sección de invitación — solo el owner administra las invitaciones.
           id como ancla de scroll desde el botón "Invite Member" */}
