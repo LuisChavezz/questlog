@@ -21,6 +21,13 @@
 
 type Row = Record<string, unknown>
 
+// Una entrada de cola es el resultado de la operación (sus filas) o un Error a
+// lanzar en su lugar. Lo segundo permite simular fallos del MOTOR a mitad de una
+// secuencia —p. ej. el deadlock que aborta una transacción entre el bloqueo y el
+// borrado— sin ejecutar SQL real, respetando el orden en que el handler ejecuta
+// sus queries.
+type QueuedResult = Row[] | Error
+
 // Registro de una operación ejecutada contra el stub. Permite afirmar sobre lo
 // que el handler ESCRIBIÓ (tabla y payload de `.set`) y sobre cómo lo leyó
 // (`.for('update')` = relectura bloqueada, `.returning()` = confirmación de
@@ -41,6 +48,12 @@ export interface DbCall {
   // una consulta paginada lleva un desempate estable (p. ej. createdAt + id) sin
   // depender de que el stub —que devuelve las filas tal cual se encolan— ordene.
   orderBy?: unknown[]
+  // Condición de `.where(...)` tal cual la construyó el handler. Se guarda como
+  // SQL de Drizzle sin interpretar: el test decide cómo afirmar sobre ella (p.
+  // ej. serializándola con `PgDialect`). Permite comprobar el ALCANCE de una
+  // escritura —que un DELETE solo puede tocar la fila indicada y no las de al
+  // lado— cuando el stub no ejecuta SQL real que lo demuestre.
+  where?: unknown
   locked: boolean
   returning: boolean
 }
@@ -74,10 +87,18 @@ interface DbStub {
 }
 
 const queues = {
-  select: [] as Row[][],
-  update: [] as Row[][],
-  insert: [] as Row[][],
-  delete: [] as Row[][],
+  select: [] as QueuedResult[],
+  update: [] as QueuedResult[],
+  insert: [] as QueuedResult[],
+  delete: [] as QueuedResult[],
+}
+
+// Consume la siguiente entrada de una cola: lanza si es un error encolado y
+// devuelve filas vacías si la cola ya se agotó.
+function takeNext(queue: QueuedResult[]): Row[] {
+  const next = queue.shift()
+  if (next instanceof Error) throw next
+  return next ?? []
 }
 
 // Orden real de ejecución de las operaciones, compartido por db y tx (la
@@ -90,7 +111,10 @@ function makeChain(call: DbCall, resolve: () => Row[]): Chain {
       call.table = table
       return chain
     },
-    where: () => chain,
+    where: (condition) => {
+      call.where = condition
+      return chain
+    },
     limit: () => chain,
     offset: () => chain,
     for: () => {
@@ -115,7 +139,11 @@ function makeChain(call: DbCall, resolve: () => Row[]): Chain {
     },
     innerJoin: () => chain,
     leftJoin: () => chain,
-    then: (onF, onR) => Promise.resolve(resolve()).then(onF, onR),
+    // El resultado se calcula DENTRO de la promesa a propósito: así un error
+    // encolado sale como rechazo (que es como llega un fallo del motor) y no
+    // como excepción síncrona desde `then`.
+    then: (onF, onR) =>
+      new Promise<Row[]>((settle) => settle(resolve())).then(onF, onR),
   }
   return chain
 }
@@ -129,14 +157,10 @@ function startCall(op: DbCall['op'], table: unknown, resolve: () => Row[]) {
 }
 
 export const dbStub: DbStub = {
-  select: () =>
-    startCall('select', undefined, () => queues.select.shift() ?? []),
-  update: (table) =>
-    startCall('update', table, () => queues.update.shift() ?? []),
-  insert: (table) =>
-    startCall('insert', table, () => queues.insert.shift() ?? []),
-  delete: (table) =>
-    startCall('delete', table, () => queues.delete.shift() ?? []),
+  select: () => startCall('select', undefined, () => takeNext(queues.select)),
+  update: (table) => startCall('update', table, () => takeNext(queues.update)),
+  insert: (table) => startCall('insert', table, () => takeNext(queues.insert)),
+  delete: (table) => startCall('delete', table, () => takeNext(queues.delete)),
   transaction: (cb) => cb(dbStub),
 }
 
@@ -159,6 +183,13 @@ export function enqueueInsert(rows: Row[]) {
 
 export function enqueueDelete(rows: Row[]) {
   queues.delete.push(rows)
+}
+
+// Encola un error para la SIGUIENTE operación de `op`, que lo lanzará en vez de
+// devolver filas. Modela un fallo del motor en un punto exacto de la secuencia
+// (un deadlock, una violación de constraint) sin alterar el resto de las colas.
+export function enqueueError(op: DbCall['op'], error: Error) {
+  queues[op].push(error)
 }
 
 export function resetDbStub() {

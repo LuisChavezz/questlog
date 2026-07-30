@@ -23,9 +23,23 @@ export function slugifyGuildName(value: string) {
 
 // ─── Esquemas de campos reutilizables ─────────────────────────────────────────
 
-/** Nombre del guild: obligatorio, máximo 100 caracteres */
+/**
+ * Nombre del guild: obligatorio, máximo 100 caracteres.
+ *
+ * `.trim()` va ANTES de `.min(1)` a propósito: recorta primero y valida
+ * después, así un nombre de solo espacios se rechaza en vez de colarse por
+ * tener longitud ≥ 1. Un nombre en blanco no era solo feo: el diálogo de
+ * borrado compara la frase tecleada contra el nombre recortado, que en ese caso
+ * quedaba vacío y dejaba el botón de confirmar deshabilitado para siempre — un
+ * guild imposible de borrar desde la UI.
+ *
+ * Además el valor que SALE del parseo ya viene recortado, así que es el nombre
+ * recortado el que se guarda: el mismo criterio de extremos que aplica el
+ * diálogo, ahora consistente de punta a punta (creación → borrado).
+ */
 export const guildNameSchema = z
   .string()
+  .trim()
   .min(1, 'Name is required')
   .max(100, 'Name must be 100 characters or fewer')
 
@@ -169,3 +183,17 @@ export const leaveGuildSchema = z.object({
 })
 
 export type LeaveGuildValues = z.infer<typeof leaveGuildSchema>
+
+// ─── Esquema de borrado del guild ─────────────────────────────────────────────
+
+/**
+ * Esquema de entrada para borrar un guild por completo. Solo lleva el slug: la
+ * confirmación tecleada del nombre es una barrera de UI (fricción antes de
+ * disparar la acción), no un dato que el servidor deba revalidar — la autoridad
+ * es la propiedad del guild, que se reverifica bajo bloqueo de fila.
+ */
+export const deleteGuildSchema = z.object({
+  slug: guildSlugSchema,
+})
+
+export type DeleteGuildValues = z.infer<typeof deleteGuildSchema>

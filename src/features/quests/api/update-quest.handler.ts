@@ -20,9 +20,17 @@ import {
   resolveGuildQuestAuth,
   resolveLockedGuildQuestAuth,
 } from '#/features/guilds/api/resolve-guild-quest-auth'
+import { withDeadlockRetry } from '#/lib/server/deadlock-retry'
 import { parseQuestDueDateValue } from '../schemas/quest-schemas'
 import type { UpdateQuestValues } from '../schemas/quest-schemas'
 import { computeGuildQuestFieldChanges } from './guild-quest-activity-log'
+
+// Conflicto genérico de esta transacción: la quest cambió entre el bloqueo y la
+// escritura. Se comparte con el reintento por deadlock para que un choque de
+// bloqueos irresoluble (ver deadlock-retry.ts) se vea igual que cualquier otra
+// carrera perdida, en vez de filtrar el «deadlock detected» crudo de Postgres.
+const QUEST_CHANGED_CONFLICT =
+  'Conflict: the quest changed while updating — please refresh and try again'
 
 export async function updateQuestHandler(
   data: UpdateQuestValues,
@@ -159,139 +167,148 @@ export async function updateQuestHandler(
   // el nuevo asignado/supervisor dejar el guild. Se reverifica todo dentro de
   // una transacción contra filas bloqueadas, de modo que un cambio concurrente
   // espere a que esta confirme en vez de colarse entre el check y el write.
-  return db.transaction(async (tx) => {
-    // La quest se bloquea ANTES que las membresías: así todos los endpoints de
-    // quests toman los bloqueos en el mismo orden (quests → guild_members) y no
-    // pueden quedar en deadlock entre sí. El bloqueo también congela el estado
-    // (guild, creador, asignado, supervisor) del que depende la autorización.
-    const lockedRows = await tx
-      .select({
-        ownerId: quests.ownerId,
-        guildId: quests.guildId,
-        assigneeId: quests.assigneeId,
-        supervisorId: quests.supervisorId,
-        // status y dueDate se leen aquí —dentro del mismo SELECT ... FOR UPDATE
-        // que ya congela la fila para la reverificación— para tener los valores
-        // PRE-update de la auditoría sin una lectura extra ni una carrera TOCTOU.
-        status: quests.status,
-        dueDate: quests.dueDate,
-      })
-      .from(quests)
-      .where(eq(quests.id, data.id))
-      .limit(1)
-      .for('update')
+  //
+  // Riesgo de deadlock con delete-guild: ese handler bloquea `guilds` primero y
+  // solo después, por la cascada de su DELETE, toca la fila de `quests` del
+  // guild — el orden contrario al de aquí (quests primero, `guilds` después vía
+  // la FK de la bitácora). Ninguno de los dos se reordena —cada orden lo exige
+  // el resto de invariantes de su propio handler—; se absorbe reintentando la
+  // transacción una vez con `withDeadlockRetry`.
+  return withDeadlockRetry(
+    () =>
+      db.transaction(async (tx) => {
+        // La quest se bloquea ANTES que las membresías: así todos los endpoints de
+        // quests toman los bloqueos en el mismo orden (quests → guild_members) y no
+        // pueden quedar en deadlock entre sí. El bloqueo también congela el estado
+        // (guild, creador, asignado, supervisor) del que depende la autorización.
+        const lockedRows = await tx
+          .select({
+            ownerId: quests.ownerId,
+            guildId: quests.guildId,
+            assigneeId: quests.assigneeId,
+            supervisorId: quests.supervisorId,
+            // status y dueDate se leen aquí —dentro del mismo SELECT ... FOR UPDATE
+            // que ya congela la fila para la reverificación— para tener los valores
+            // PRE-update de la auditoría sin una lectura extra ni una carrera TOCTOU.
+            status: quests.status,
+            dueDate: quests.dueDate,
+          })
+          .from(quests)
+          .where(eq(quests.id, data.id))
+          .limit(1)
+          .for('update')
 
-    // Existía en la lectura previa; si ya no está, otra transacción la borró.
-    if (lockedRows.length === 0) {
-      throw new Error(
-        'Conflict: the quest was deleted — please refresh and try again',
-      )
-    }
+        // Existía en la lectura previa; si ya no está, otra transacción la borró.
+        if (lockedRows.length === 0) {
+          throw new Error(
+            'Conflict: the quest was deleted — please refresh and try again',
+          )
+        }
 
-    const locked = lockedRows[0]
+        const locked = lockedRows[0]
 
-    if (locked.guildId) {
-      // Mismos predicados y mismo orden que arriba, ahora contra el estado
-      // bloqueado. Como la comprobación previa acaba de pasar, si fallan aquí
-      // solo puede ser porque algo cambió: conflicto en vez de "Forbidden".
-      const { viewer, roleByUserId } = await resolveLockedGuildQuestAuth(
-        tx,
-        locked.guildId,
-        userId,
-        [locked.ownerId, data.assigneeId, data.supervisorId],
-      )
-      const lockedTarget = {
-        creatorId: locked.ownerId,
-        creatorRole: roleByUserId.get(locked.ownerId) ?? null,
-        assigneeId: locked.assigneeId,
-        supervisorId: locked.supervisorId,
-      }
+        if (locked.guildId) {
+          // Mismos predicados y mismo orden que arriba, ahora contra el estado
+          // bloqueado. Como la comprobación previa acaba de pasar, si fallan aquí
+          // solo puede ser porque algo cambió: conflicto en vez de "Forbidden".
+          const { viewer, roleByUserId } = await resolveLockedGuildQuestAuth(
+            tx,
+            locked.guildId,
+            userId,
+            [locked.ownerId, data.assigneeId, data.supervisorId],
+          )
+          const lockedTarget = {
+            creatorId: locked.ownerId,
+            creatorRole: roleByUserId.get(locked.ownerId) ?? null,
+            assigneeId: locked.assigneeId,
+            supervisorId: locked.supervisorId,
+          }
 
-      if (touchesManagementField) {
-        if (!canManageGuildQuest(viewer, lockedTarget)) {
+          if (touchesManagementField) {
+            if (!canManageGuildQuest(viewer, lockedTarget)) {
+              throw new Error(
+                'Conflict: your permissions on this quest changed — please refresh and try again',
+              )
+            }
+          } else if (data.status !== undefined) {
+            if (!canUpdateGuildQuestStatus(viewer, lockedTarget)) {
+              throw new Error(
+                'Conflict: your permissions on this quest changed — please refresh and try again',
+              )
+            }
+          }
+
+          if (data.assigneeId && !roleByUserId.has(data.assigneeId)) {
+            throw new Error(
+              'Conflict: the assignee is no longer a member of this guild — please refresh and try again',
+            )
+          }
+          if (data.supervisorId && !roleByUserId.has(data.supervisorId)) {
+            throw new Error(
+              'Conflict: the supervisor is no longer a member of this guild — please refresh and try again',
+            )
+          }
+        } else if (locked.ownerId !== userId) {
           throw new Error(
             'Conflict: your permissions on this quest changed — please refresh and try again',
           )
         }
-      } else if (data.status !== undefined) {
-        if (!canUpdateGuildQuestStatus(viewer, lockedTarget)) {
-          throw new Error(
-            'Conflict: your permissions on this quest changed — please refresh and try again',
+
+        // El WHERE usa los valores BLOQUEADOS, no el snapshot previo: acota por id
+        // y, para una quest de guild, por su guild (para no cruzar de guild); para
+        // una personal, por owner (verificado ya, pero defensivo).
+        const updated = await tx
+          .update(quests)
+          .set(updatePayload)
+          .where(
+            locked.guildId
+              ? and(eq(quests.id, data.id), eq(quests.guildId, locked.guildId))
+              : and(eq(quests.id, data.id), eq(quests.ownerId, userId)),
           )
+          .returning()
+
+        // returning() confirma que la fila seguía ahí al escribir. Con el bloqueo
+        // tomado no debería poder faltar, pero 0 filas sería una escritura perdida
+        // en silencio: se aborta para que el cliente no la dé por aplicada.
+        if (updated.length === 0) {
+          throw new Error(QUEST_CHANGED_CONFLICT)
         }
-      }
 
-      if (data.assigneeId && !roleByUserId.has(data.assigneeId)) {
-        throw new Error(
-          'Conflict: the assignee is no longer a member of this guild — please refresh and try again',
-        )
-      }
-      if (data.supervisorId && !roleByUserId.has(data.supervisorId)) {
-        throw new Error(
-          'Conflict: the supervisor is no longer a member of this guild — please refresh and try again',
-        )
-      }
-    } else if (locked.ownerId !== userId) {
-      throw new Error(
-        'Conflict: your permissions on this quest changed — please refresh and try again',
-      )
-    }
+        // Auditoría: solo quests de guild. Una fila `field_updated` por cada campo
+        // rastreado que CAMBIÓ de verdad (los no-ops no generan fila), en la MISMA
+        // transacción que el UPDATE. Los `oldValue` salen de `locked` (estado
+        // pre-update bloqueado); una quest personal (`locked.guildId` NULL) nunca
+        // entra aquí.
+        if (locked.guildId) {
+          const guildId = locked.guildId
+          const changes = computeGuildQuestFieldChanges(
+            {
+              status: locked.status,
+              assigneeId: locked.assigneeId,
+              supervisorId: locked.supervisorId,
+              dueDate: locked.dueDate,
+            },
+            data,
+          )
+          if (changes.length > 0) {
+            await tx.insert(guildQuestActivityLog).values(
+              changes.map(
+                (change): NewGuildQuestActivityLog => ({
+                  questId: data.id,
+                  guildId,
+                  actorId: userId,
+                  eventType: 'field_updated',
+                  field: change.field,
+                  oldValue: change.oldValue,
+                  newValue: change.newValue,
+                }),
+              ),
+            )
+          }
+        }
 
-    // El WHERE usa los valores BLOQUEADOS, no el snapshot previo: acota por id
-    // y, para una quest de guild, por su guild (para no cruzar de guild); para
-    // una personal, por owner (verificado ya, pero defensivo).
-    const updated = await tx
-      .update(quests)
-      .set(updatePayload)
-      .where(
-        locked.guildId
-          ? and(eq(quests.id, data.id), eq(quests.guildId, locked.guildId))
-          : and(eq(quests.id, data.id), eq(quests.ownerId, userId)),
-      )
-      .returning()
-
-    // returning() confirma que la fila seguía ahí al escribir. Con el bloqueo
-    // tomado no debería poder faltar, pero 0 filas sería una escritura perdida
-    // en silencio: se aborta para que el cliente no la dé por aplicada.
-    if (updated.length === 0) {
-      throw new Error(
-        'Conflict: the quest changed while updating — please refresh and try again',
-      )
-    }
-
-    // Auditoría: solo quests de guild. Una fila `field_updated` por cada campo
-    // rastreado que CAMBIÓ de verdad (los no-ops no generan fila), en la MISMA
-    // transacción que el UPDATE. Los `oldValue` salen de `locked` (estado
-    // pre-update bloqueado); una quest personal (`locked.guildId` NULL) nunca
-    // entra aquí.
-    if (locked.guildId) {
-      const guildId = locked.guildId
-      const changes = computeGuildQuestFieldChanges(
-        {
-          status: locked.status,
-          assigneeId: locked.assigneeId,
-          supervisorId: locked.supervisorId,
-          dueDate: locked.dueDate,
-        },
-        data,
-      )
-      if (changes.length > 0) {
-        await tx.insert(guildQuestActivityLog).values(
-          changes.map(
-            (change): NewGuildQuestActivityLog => ({
-              questId: data.id,
-              guildId,
-              actorId: userId,
-              eventType: 'field_updated',
-              field: change.field,
-              oldValue: change.oldValue,
-              newValue: change.newValue,
-            }),
-          ),
-        )
-      }
-    }
-
-    return updated[0]
-  })
+        return updated[0]
+      }),
+    QUEST_CHANGED_CONFLICT,
+  )
 }

@@ -37,9 +37,15 @@ export const quests = pgTable('quests', {
   supervisorId: text('supervisor_id').references(() => user.id, {
     onDelete: 'set null',
   }),
-  // Guild al que pertenece la quest; NULL = quest personal
+  // Guild al que pertenece la quest; NULL = quest personal.
+  // CASCADE a propósito: borrar un guild borra sus quests, NO las convierte en
+  // personales. Un `set null` reasignaría en silencio quests de guild a la lista
+  // personal de su creador —con asignado/supervisor de un guild que ya no
+  // existe—, así que la quest muere con el guild. De esta cascada cuelga a su vez
+  // la de `guild_quest_activity_log.quest_id`, que ya era CASCADE: la bitácora de
+  // cada quest se va con ella (ver el comentario de esa columna).
   guildId: text('guild_id').references(() => guilds.id, {
-    onDelete: 'set null',
+    onDelete: 'cascade',
   }),
   title: text('title').notNull(),
   description: text('description'),

@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GuildRole, QuestStatus } from '#/db/schema'
 import { guildQuestActivityLog } from '#/db/schema'
 import {
+  enqueueError,
   enqueueSelect,
   enqueueUpdate,
   getDbCalls,
@@ -41,6 +42,25 @@ function payload(
 
 function personalRow(ownerId: string) {
   return { ownerId, guildId: null, assigneeId: null, supervisorId: null }
+}
+
+const QUEST_CHANGED_CONFLICT =
+  'Conflict: the quest changed while updating — please refresh and try again'
+
+// Error tal y como lo entrega Drizzle: el del driver `pg` —que es quien lleva el
+// SQLSTATE en `code`— envuelto en el error de consulta, con el original en
+// `cause`. El handler solo ve el de fuera, así que el `code` no está en la raíz.
+function drizzleError(code: string, message: string) {
+  return new Error('Failed query: update "quests" set "title" = $1', {
+    cause: Object.assign(new Error(message), { code }),
+  })
+}
+
+// 40P01 = deadlock detected. Se dispara cuando una edición de quest de guild
+// (que bloquea la quest y luego toca `guilds` vía la FK de la bitácora) se cruza
+// con el borrado de ese mismo guild (que bloquea `guilds` y cascadea a `quests`).
+function deadlockError() {
+  return drizzleError('40P01', 'deadlock detected')
 }
 
 // Fija el contexto de auth de guild (viewer + roles) que devolverán ambos
@@ -141,7 +161,10 @@ describe('updateQuestHandler — gate y quest personal', () => {
     enqueueSelect([personalRow(USER)])
     enqueueUpdate([{ id: 'quest-1', ownerId: USER, guildId: null }])
 
-    await updateQuestHandler(payload({ title: undefined, status: 'done' }), USER)
+    await updateQuestHandler(
+      payload({ title: undefined, status: 'done' }),
+      USER,
+    )
 
     expect(activityLogInserts()).toHaveLength(0)
   })
@@ -338,7 +361,11 @@ describe('updateQuestHandler — bitácora de auditoría de guild', () => {
   it('cambiar varios campos rastreados en una llamada escribe una fila por campo', async () => {
     // status (backlog→done) y dueDate (null→2026-08-01) en el mismo update.
     await setupGuildQuest({
-      data: payload({ title: undefined, status: 'done', dueDate: '2026-08-01' }),
+      data: payload({
+        title: undefined,
+        status: 'done',
+        dueDate: '2026-08-01',
+      }),
       viewerId: 'u-creator',
       viewerRole: 'member',
       creatorId: 'u-creator',
@@ -431,5 +458,101 @@ describe('updateQuestHandler — bitácora de auditoría de guild', () => {
     })
 
     expect(activityLogInserts()).toHaveLength(0)
+  })
+})
+
+describe('updateQuestHandler — reintento por deadlock', () => {
+  // Casos de quest PERSONAL a propósito: no involucran los resolvers de auth de
+  // guild (mockeados aparte), así que el reintento se aísla del resto de la
+  // lógica bajo prueba y solo quedan las lecturas/escrituras propias de la
+  // transacción — lectura previa (fuera, no se repite), lectura bloqueada y
+  // UPDATE (dentro, sí se repiten).
+  it('repite la transacción entera cuando Postgres la aborta por deadlock', async () => {
+    const updated = {
+      id: 'quest-1',
+      ownerId: USER,
+      guildId: null,
+      title: 'New title',
+    }
+
+    enqueueSelect([personalRow(USER)]) // lectura previa, fuera de la transacción
+    // Primer intento: la fila se bloquea y el UPDATE muere en el deadlock.
+    enqueueSelect([personalRow(USER)])
+    enqueueError('update', deadlockError())
+    // Segundo intento: la transacción se repite completa y esta vez pasa.
+    enqueueSelect([personalRow(USER)])
+    enqueueUpdate([updated])
+
+    await expect(updateQuestHandler(payload(), USER)).resolves.toEqual(updated)
+
+    // Lo esencial del reintento: NO reanuda donde murió. Vuelve a bloquear la
+    // fila antes del segundo UPDATE — si se saltara el bloqueo, la segunda
+    // pasada escribiría sobre un estado sin (re)verificar.
+    expect(getDbCalls().map((call) => call.op)).toEqual([
+      'select',
+      'select',
+      'update',
+      'select',
+      'update',
+    ])
+    const lockedReads = getDbCalls().filter(
+      (call) => call.op === 'select' && call.locked,
+    )
+    expect(lockedReads).toHaveLength(2)
+  })
+
+  it('con el deadlock persistente devuelve el Conflict de siempre, sin filtrar el error de Postgres', async () => {
+    enqueueSelect([personalRow(USER)])
+    enqueueSelect([personalRow(USER)])
+    enqueueError('update', deadlockError())
+    enqueueSelect([personalRow(USER)])
+    enqueueError('update', deadlockError())
+
+    const error = await updateQuestHandler(payload(), USER).catch(
+      (e: unknown) => e,
+    )
+
+    expect(error).toBeInstanceOf(Error)
+    // El usuario ve el mismo mensaje que ante cualquier otra carrera perdida…
+    expect((error as Error).message).toBe(QUEST_CHANGED_CONFLICT)
+    // …y nunca el «deadlock detected» crudo del motor.
+    expect((error as Error).message).not.toContain('deadlock')
+    expect((error as Error).message).not.toContain('Failed query')
+
+    // Exactamente dos intentos: un solo reintento, no un bucle.
+    expect(getDbCalls().filter((call) => call.op === 'update')).toHaveLength(2)
+  })
+
+  it('no reintenta un conflicto de permisos: falla en el primer intento', async () => {
+    // El pre-check pasa (USER es el dueño en el snapshot), pero la fila
+    // bloqueada ya pertenece a otro usuario — un cambio concurrente real, no un
+    // deadlock, así que debe fallar ya y no repetirse.
+    enqueueSelect([personalRow(USER)]) // pre-check: pasa
+    enqueueSelect([personalRow('someone-else')]) // lectura bloqueada: ya cambió
+
+    await expect(updateQuestHandler(payload(), USER)).rejects.toThrow(
+      'Conflict: your permissions on this quest changed — please refresh and try again',
+    )
+
+    // Una sola lectura bloqueada y ningún UPDATE: no hubo segunda pasada.
+    const lockedReads = getDbCalls().filter(
+      (call) => call.op === 'select' && call.locked,
+    )
+    expect(lockedReads).toHaveLength(1)
+    expect(getDbCalls().filter((call) => call.op === 'update')).toHaveLength(0)
+  })
+
+  it('no reintenta un error de base de datos que no sea deadlock', async () => {
+    // 23503 = foreign_key_violation. No es un choque de bloqueos, así que se
+    // propaga tal cual en vez de repetirse o disfrazarse de conflicto.
+    const fkViolation = drizzleError('23503', 'fk violation')
+
+    enqueueSelect([personalRow(USER)])
+    enqueueSelect([personalRow(USER)])
+    enqueueError('update', fkViolation)
+
+    await expect(updateQuestHandler(payload(), USER)).rejects.toBe(fkViolation)
+
+    expect(getDbCalls().filter((call) => call.op === 'update')).toHaveLength(1)
   })
 })

@@ -11,6 +11,7 @@ import { Label } from '#/components/ui/label'
 import { regenerateInviteCode } from '#/features/guilds/api/regenerate-invite-code'
 import { guildQueryOptions } from '#/features/guilds/api/guild-query-options'
 import { GuildCoatOfArms } from '#/features/guilds/components/guild-coat-of-arms'
+import { useDeleteGuild } from '#/features/guilds/hooks/use-delete-guild'
 import { useLeaveGuild } from '#/features/guilds/hooks/use-leave-guild'
 import { useRegenerateCoatOfArms } from '#/features/guilds/hooks/use-regenerate-coat-of-arms'
 import { isGuildOwner } from '#/features/guilds/role-labels'
@@ -32,9 +33,11 @@ function GuildSettingsPage() {
 
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [leaveOpen, setLeaveOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
 
   const leaveGuild = useLeaveGuild(slug, () => setLeaveOpen(false))
+  const deleteGuild = useDeleteGuild(slug, () => setDeleteOpen(false))
   const regenerateCoatOfArms = useRegenerateCoatOfArms(slug)
 
   // Owner estructural (guilds.owner_id) — decide qué secciones se muestran
@@ -218,6 +221,42 @@ function GuildSettingsPage() {
         )}
       </section>
 
+      {/* Danger Zone — acciones irreversibles. Solo el Guild Master (dueño
+          estructural) llega aquí: la página de Settings es visible para todo
+          miembro, así que un Officer no debe ni ver este bloque. Va separado del
+          resto por su propio marco en color destructivo, al final de la página,
+          para que no se confunda con los ajustes normales de arriba. */}
+      {isOwner && (
+        <section className="flex flex-col gap-3 rounded-xl border border-destructive/40 bg-destructive/5 p-5">
+          <h3 className="text-sm font-semibold text-destructive">
+            Danger Zone
+          </h3>
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium text-foreground">Delete Guild</p>
+            <p className="text-xs text-muted-foreground">
+              Permanently delete {guildName}, all of its quests, and all of its
+              activity history. Every member loses access. This cannot be
+              undone.
+            </p>
+          </div>
+          <Button
+            variant="destructive"
+            className="w-fit"
+            onClick={() => setDeleteOpen(true)}
+            disabled={deleteGuild.isPending}
+          >
+            {deleteGuild.isPending ? 'Deleting…' : 'Delete Guild'}
+          </Button>
+          {/* El ConfirmDialog se cierra al fallar, así que el error se muestra
+              aquí para no perderlo — mismo criterio que la salida del guild */}
+          {deleteGuild.error && (
+            <p className="text-xs text-destructive">
+              {deleteGuild.error.message}
+            </p>
+          )}
+        </section>
+      )}
+
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
@@ -243,6 +282,34 @@ function GuildSettingsPage() {
           }
         }}
       />
+
+      {/* Borrado del guild — irreversible y en cascada, así que sube la fricción
+          respecto al resto de confirmaciones: exige teclear el nombre exacto del
+          guild (mismo criterio que la transferencia de propiedad). La frase se
+          exige siempre: sin el detalle cargado no hay nombre contra el que
+          comparar, y una cadena vacía deja el botón deshabilitado (el fallo
+          seguro) en vez de convertirlo en una confirmación de un solo clic. El
+          diálogo se monta bajo el mismo `isOwner` que su botón: si la propiedad
+          se transfiere con Settings abierto, la puerta se cierra entera y no
+          queda un diálogo huérfano al alcance de quien ya no es Guild Master. */}
+      {isOwner && (
+        <ConfirmDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          title={`Delete ${guildName}?`}
+          description={`This permanently deletes ${guildName} for everyone: all of its quests and all of its activity history are erased along with it, and every member loses access. This action cannot be undone.`}
+          confirmLabel="Delete Guild"
+          variant="destructive"
+          confirmationPhrase={data?.guild.name ?? ''}
+          onConfirm={async () => {
+            try {
+              await deleteGuild.mutateAsync()
+            } catch {
+              // El error queda en deleteGuild.error y se muestra en la sección
+            }
+          }}
+        />
+      )}
     </div>
   )
 }
