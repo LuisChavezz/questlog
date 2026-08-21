@@ -357,17 +357,7 @@ export function DataTable<TData extends RowData, TValue>({
     // solo resuelve conflictos entre clases del MISMO elemento, así que un
     // `className="gap-2"` externo no puede pisar silenciosamente el toggle.
     <div className={className}>
-      <div
-        className={cn(
-          'flex flex-col',
-          // El toggle a `gap-0` solo tiene sentido cuando SÍ hay una fila de
-          // filtros que colapsar — sin filtros, no hay nada que este `gap`
-          // esté supliendo, y debe mantenerse en su valor de siempre. Como
-          // `filters` son datos (no un nodo), `hasFilterBar` refleja contenido
-          // real: una lista vacía nunca hereda `gap-0` por accidente.
-          hasFilterBar ? (filterPanelOpen ? 'gap-4' : 'gap-0') : 'gap-4',
-        )}
-      >
+      <div className="flex flex-col gap-4">
         <DataTableToolbar
           table={table}
           filterPlaceholder={filterPlaceholder}
