@@ -1,7 +1,7 @@
 // Función de servidor — obtiene todas las quests de un guild específico
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
-import { asc, eq } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 
 import { db } from '#/db'
 import { guilds, quests } from '#/db/schema'
@@ -42,5 +42,5 @@ export const getGuildQuests = createServerFn({ method: 'GET' })
       .select()
       .from(quests)
       .where(eq(quests.guildId, guild.id))
-      .orderBy(asc(quests.createdAt))
+      .orderBy(desc(quests.createdAt))
   })

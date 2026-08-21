@@ -13,7 +13,7 @@
 // mantener esta query plana es lo que preserva la forma de la caché.
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
-import { asc } from 'drizzle-orm'
+import { desc } from 'drizzle-orm'
 
 import { db } from '#/db'
 import { quests } from '#/db/schema'
@@ -32,7 +32,7 @@ export const getQuests = createServerFn({ method: 'GET' }).handler(async () => {
     .select()
     .from(quests)
     .where(buildVisibleQuestsFilter(session.user.id))
-    .orderBy(asc(quests.createdAt))
+    .orderBy(desc(quests.createdAt))
 
   return result
 })
