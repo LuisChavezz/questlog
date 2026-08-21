@@ -76,6 +76,47 @@ export const createGuildSchema = z.object({
 
 export type CreateGuildValues = z.infer<typeof createGuildSchema>
 
+// ─── Esquema de edición del perfil ────────────────────────────────────────────
+
+/**
+ * Descripción tal como viaja desde el formulario de edición. Se diferencia de
+ * `guildDescriptionSchema` (el del alta) en dos cosas:
+ *
+ * - **No es opcional.** El formulario de edición manda siempre el campo, porque
+ *   envía lo que hay en pantalla; "ausente" no es un estado que pueda producir.
+ * - **La cadena vacía es un valor legítimo**, no un error: es la única forma de
+ *   expresar "borrá la descripción". El handler la traduce a NULL antes de
+ *   escribir, así la columna nunca guarda una cadena vacía que luego habría que
+ *   distinguir de la ausencia de descripción en cada lectura.
+ *
+ * El `.trim()` va ANTES del `.max()`, mismo criterio que `guildNameSchema`: si
+ * se recortara después, una descripción que CABE en el límite se rechazaría por
+ * un espacio o un salto de línea final invisible —lo que arrastra cualquier
+ * texto pegado desde un documento—, y el usuario no tendría forma de ver qué
+ * sobra. Por eso no se deriva del esquema de alta con `.unwrap()`: eso heredaba
+ * el `.max()` ya encadenado y forzaba el orden inverso.
+ */
+export const editableGuildDescriptionSchema = z
+  .string()
+  .trim()
+  .max(500, 'Description must be 500 characters or fewer')
+
+/**
+ * Esquema para editar el perfil de un guild (nombre y descripción).
+ * El `slug` viaja como identificador del guild, NO como campo editable: es
+ * inmutable tras la creación porque cuelga de él la URL pública del guild.
+ */
+export const updateGuildSchema = z.object({
+  slug: guildSlugSchema,
+  name: guildNameSchema,
+  description: editableGuildDescriptionSchema,
+})
+
+export type UpdateGuildValues = z.infer<typeof updateGuildSchema>
+
+/** Valores que edita el formulario: el perfil sin el slug, que no se toca. */
+export type GuildProfileFormValues = Omit<UpdateGuildValues, 'slug'>
+
 // ─── Esquema de consulta por slug ─────────────────────────────────────────────
 
 /** Esquema de entrada para obtener el detalle de un guild por slug */

@@ -11,6 +11,7 @@ import { Label } from '#/components/ui/label'
 import { regenerateInviteCode } from '#/features/guilds/api/regenerate-invite-code'
 import { guildQueryOptions } from '#/features/guilds/api/guild-query-options'
 import { GuildCoatOfArms } from '#/features/guilds/components/guild-coat-of-arms'
+import { GuildProfileForm } from '#/features/guilds/components/guild-profile-form'
 import { useDeleteGuild } from '#/features/guilds/hooks/use-delete-guild'
 import { useLeaveGuild } from '#/features/guilds/hooks/use-leave-guild'
 import { useRegenerateCoatOfArms } from '#/features/guilds/hooks/use-regenerate-coat-of-arms'
@@ -74,10 +75,30 @@ function GuildSettingsPage() {
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
           {isOwner
-            ? "Manage your guild's invitation settings and membership."
+            ? "Manage your guild's profile, invitation settings and membership."
             : 'Manage your guild membership.'}
         </p>
       </div>
+
+      {/* Perfil del guild — nombre y descripción, solo editables por el owner.
+          Va primero porque es lo que identifica al guild en toda la app (la
+          cabecera de estas mismas páginas y las cards del directorio), antes
+          que los ajustes de invitación o membresía. El slug NO se edita acá:
+          es inmutable tras la creación (ver guild-profile-form.tsx). El
+          formulario se monta con los valores actuales como estado inicial, así
+          que se remonta con `key` al cambiar el guild — sin eso, navegar entre
+          guilds reusaría la instancia y dejaría los datos del anterior. */}
+      {isOwner && data && (
+        <section className="flex flex-col gap-4">
+          <h3 className="text-sm font-medium text-foreground">Guild Profile</h3>
+          <GuildProfileForm
+            key={data.guild.id}
+            slug={slug}
+            name={data.guild.name}
+            description={data.guild.description}
+          />
+        </section>
+      )}
 
       {/* Sección de escudo de armas — solo el owner puede re-rolarlo. Sirve
           tanto para regenerar uno existente como para generar el primero en
