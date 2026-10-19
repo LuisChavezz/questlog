@@ -56,12 +56,15 @@ function enqueueLeaveFlow(
   opts: {
     locked?: { id: string }[]
     currentOwnerId?: string
+    guildGone?: boolean
     deleted?: { id: string }[]
   } = {},
 ) {
   enqueueSelect([{ id: 'membership-1' }]) // lectura previa de la membresía
   enqueueSelect(opts.locked ?? [{ id: 'membership-1' }]) // relectura bloqueada
-  enqueueSelect([{ ownerId: opts.currentOwnerId ?? OWNER }]) // owner estructural
+  enqueueSelect(
+    opts.guildGone ? [] : [{ ownerId: opts.currentOwnerId ?? OWNER }],
+  ) // owner estructural
   enqueueDelete(opts.deleted ?? [{ id: 'membership-1' }]) // borrado
 }
 
@@ -203,6 +206,15 @@ describe('leaveGuildHandler — reverificación TOCTOU bajo bloqueo', () => {
       'Conflict: your membership changed while leaving — please refresh and try again',
     )
     expect(getDbCalls().filter((call) => call.op === 'update')).toHaveLength(0)
+  })
+  it('aborta con un Conflict propio si el guild se borró antes del bloqueo', async () => {
+    setupGuild()
+    enqueueLeaveFlow({ guildGone: true })
+
+    await expect(leaveGuildHandler({ slug: SLUG }, MEMBER)).rejects.toThrow(
+      'Conflict: this guild no longer exists — please refresh and try again',
+    )
+    expect(getDbCalls().filter((call) => call.op !== 'select')).toHaveLength(0)
   })
 })
 

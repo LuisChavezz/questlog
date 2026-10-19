@@ -108,13 +108,17 @@ export async function leaveGuildHandler(
           .where(eq(guilds.id, guild.id))
           .limit(1)
 
-        // Si el guild desapareció (borrado concurrente) o quien sale es ahora el
-        // owner (una transferencia ganó la carrera), abortar en vez de dejar el
-        // guild con un owner sin fila de membresía.
-        if (
-          lockedGuilds.length === 0 ||
-          isGuildOwner(lockedGuilds[0].ownerId, userId)
-        ) {
+        // El guild desapareció entre la comprobación previa y el bloqueo
+        // (borrado concurrente): no hay nada de lo que salir.
+        if (lockedGuilds.length === 0) {
+          throw new Error(
+            'Conflict: this guild no longer exists — please refresh and try again',
+          )
+        }
+
+        // Si quien sale es ahora el owner (una transferencia ganó la carrera),
+        // abortar en vez de dejar el guild con un owner sin fila de membresía.
+        if (isGuildOwner(lockedGuilds[0].ownerId, userId)) {
           throw new Error(
             'Conflict: you are now the guild owner — please refresh and try again',
           )

@@ -51,12 +51,15 @@ function enqueueRoleChangeFlow(
   opts: {
     locked?: { id: string }[]
     currentOwnerId?: string
+    guildGone?: boolean
     updated?: { id: string }[]
   } = {},
 ) {
   enqueueSelect([{ id: 'membership-1' }]) // lectura previa del objetivo
   enqueueSelect(opts.locked ?? [{ id: 'membership-1' }]) // relectura bloqueada
-  enqueueSelect([{ ownerId: opts.currentOwnerId ?? OWNER }]) // owner estructural
+  enqueueSelect(
+    opts.guildGone ? [] : [{ ownerId: opts.currentOwnerId ?? OWNER }],
+  ) // owner estructural
   enqueueUpdate(opts.updated ?? [{ id: 'membership-1' }])
 }
 
@@ -208,5 +211,17 @@ describe('updateGuildMemberRoleHandler — reverificación TOCTOU bajo bloqueo',
     ).rejects.toThrow(
       'Conflict: this member is no longer in the guild — please refresh and try again',
     )
+  })
+
+  it('aborta con un Conflict propio si el guild se borró antes del bloqueo', async () => {
+    setupGuild()
+    enqueueRoleChangeFlow({ guildGone: true })
+
+    await expect(
+      updateGuildMemberRoleHandler(payload(MEMBER, 'admin'), OWNER),
+    ).rejects.toThrow(
+      'Conflict: this guild no longer exists — please refresh and try again',
+    )
+    expect(getDbCalls().filter((call) => call.op !== 'select')).toHaveLength(0)
   })
 })
