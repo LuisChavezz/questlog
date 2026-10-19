@@ -41,9 +41,10 @@ function guildQuest(id: string, ownerId: string) {
 function guildCtx(
   viewerRole: GuildRole,
   creatorRoles: Record<string, GuildRole>,
+  viewerId = 'u-officer',
 ) {
   return {
-    viewer: { viewerId: 'u-officer', viewerRole, ownerId: GM },
+    viewer: { viewerId, viewerRole, ownerId: GM },
     roleByUserId: new Map<string, GuildRole>(Object.entries(creatorRoles)),
   }
 }
@@ -145,5 +146,45 @@ describe('deleteQuestsHandler — lote de guild', () => {
     expect(
       calls.some((call) => call.op === 'delete' && call.table === quests),
     ).toBe(true)
+  })
+})
+
+describe('deleteQuestsHandler — creador que ya no es miembro', () => {
+  it('un Officer borra un lote con la quest de un ex-miembro (ausente del mapa de roles)', async () => {
+    const rows = [guildQuest('q1', 'u-m1'), guildQuest('q2', 'u-ex-member')]
+    // Solo el Member vigente tiene rol: el ex-miembro no tiene fila.
+    const ctx = guildCtx('admin', { 'u-m1': 'member' })
+    vi.mocked(resolveGuildQuestAuth).mockResolvedValue(ctx)
+    vi.mocked(resolveLockedGuildQuestAuth).mockResolvedValue(ctx)
+
+    enqueueSelect(rows)
+    enqueueSelect(rows)
+    enqueueDelete(rows)
+
+    const result = await deleteQuestsHandler({ ids: ['q1', 'q2'] }, 'u-officer')
+    expect(result).toHaveLength(2)
+
+    // Ambos creadores se pidieron al resolver, en la lectura previa y en la
+    // bloqueada: el ex-miembro es "no miembro", no "olvidado".
+    expect(vi.mocked(resolveGuildQuestAuth).mock.calls[0][2]).toEqual(
+      expect.arrayContaining(['u-m1', 'u-ex-member']),
+    )
+    expect(vi.mocked(resolveLockedGuildQuestAuth).mock.calls[0][3]).toEqual(
+      expect.arrayContaining(['u-m1', 'u-ex-member']),
+    )
+  })
+
+  it('fail-closed: un Member no puede borrar la quest de un ex-miembro', async () => {
+    const rows = [guildQuest('q1', 'u-ex-member')]
+    const ctx = guildCtx('member', {}, 'u-member')
+    vi.mocked(resolveGuildQuestAuth).mockResolvedValue(ctx)
+
+    enqueueSelect(rows)
+
+    await expect(
+      deleteQuestsHandler({ ids: ['q1'] }, 'u-member'),
+    ).rejects.toThrow(
+      'Forbidden: you do not have permission to delete one or more of the selected quests',
+    )
   })
 })
