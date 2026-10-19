@@ -12,6 +12,7 @@ import { PgDialect } from 'drizzle-orm/pg-core'
 import { guildMembers, guilds, quests } from '#/db/schema'
 import {
   enqueueDelete,
+  enqueueError,
   enqueueSelect,
   getDbCalls,
   resetDbStub,
@@ -62,6 +63,23 @@ function enqueueLeaveFlow(
   enqueueSelect(opts.locked ?? [{ id: 'membership-1' }]) // relectura bloqueada
   enqueueSelect([{ ownerId: opts.currentOwnerId ?? OWNER }]) // owner estructural
   enqueueDelete(opts.deleted ?? [{ id: 'membership-1' }]) // borrado
+}
+
+// Error tal y como lo entrega Drizzle: el del driver `pg` —que lleva el
+// SQLSTATE en `code`— envuelto en el error de consulta, con el original en
+// `cause`. 40P01 = deadlock detected.
+function deadlockError() {
+  return new Error('Failed query: update "quests" set "assignee_id" = $1', {
+    cause: Object.assign(new Error('deadlock detected'), { code: '40P01' }),
+  })
+}
+
+// Una pasada de la transacción (sin la lectura previa): relectura bloqueada,
+// owner estructural y borrado de la membresía.
+function enqueueTransactionAttempt() {
+  enqueueSelect([{ id: 'membership-1' }])
+  enqueueSelect([{ ownerId: OWNER }])
+  enqueueDelete([{ id: 'membership-1' }])
 }
 
 afterEach(() => {
@@ -240,5 +258,44 @@ describe('leaveGuildHandler — limpieza de asignaciones', () => {
 
     const deleteCall = getDbCalls().find((call) => call.op === 'delete')
     expect(toQuery(deleteCall?.where).params).toEqual([GUILD, MEMBER])
+  })
+})
+
+describe('leaveGuildHandler — reintento por deadlock', () => {
+  it('repite la transacción entera cuando Postgres la aborta por deadlock', async () => {
+    setupGuild()
+    enqueueSelect([{ id: 'membership-1' }]) // lectura previa
+    enqueueTransactionAttempt()
+    // La limpieza de asignado muere en el deadlock (cruce con update-quest).
+    enqueueError('update', deadlockError())
+    enqueueTransactionAttempt() // segundo intento, sin error
+
+    await expect(leaveGuildHandler({ slug: SLUG }, MEMBER)).resolves.toEqual({
+      slug: SLUG,
+    })
+
+    // Dos pasadas completas: dos relecturas bloqueadas y dos borrados.
+    const calls = getDbCalls()
+    expect(calls.filter((call) => call.locked)).toHaveLength(2)
+    expect(calls.filter((call) => call.op === 'delete')).toHaveLength(2)
+  })
+
+  it('con el deadlock persistente devuelve el Conflict de siempre, sin filtrar el error de Postgres', async () => {
+    setupGuild()
+    enqueueSelect([{ id: 'membership-1' }])
+    enqueueTransactionAttempt()
+    enqueueError('update', deadlockError())
+    enqueueTransactionAttempt()
+    enqueueError('update', deadlockError())
+
+    const error = await leaveGuildHandler({ slug: SLUG }, MEMBER).catch(
+      (caught: unknown) => caught,
+    )
+
+    expect((error as Error).message).toBe(
+      'Conflict: your membership changed while leaving — please refresh and try again',
+    )
+    expect((error as Error).message).not.toContain('deadlock')
+    expect((error as Error).message).not.toContain('Failed query')
   })
 })
