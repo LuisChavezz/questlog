@@ -6,7 +6,7 @@
 // feature, con coatOfArmsSvg null) como para "re-rolar" uno existente: ambos
 // casos son la misma operación, no hay que distinguirlos.
 import { createId } from '@paralleldrive/cuid2'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 
 import { db } from '#/db'
 import { guilds } from '#/db/schema'
@@ -43,10 +43,25 @@ export async function regenerateCoatOfArmsHandler(
     )
   }
 
-  await db
+  // El `ownerId` va en el WHERE, no solo en el check de arriba: es la
+  // reverificación de la propiedad, evaluada por el motor en el mismo statement
+  // que la escritura (mismo criterio que update-guild.handler.ts). Bloquear la
+  // fila con FOR UPDATE obligaría a retenerla durante la llamada a Armoria,
+  // así que aquí la variante atómica es la única razonable.
+  const updated = await db
     .update(guilds)
     .set({ coatOfArmsSeed: newSeed, coatOfArmsSvg: svg })
-    .where(eq(guilds.id, guild.id))
+    .where(and(eq(guilds.id, guild.id), eq(guilds.ownerId, userId)))
+    .returning({ id: guilds.id })
+
+  // Cero filas con el check previo ya superado solo puede ser un cambio
+  // concurrente: el guild se borró o la propiedad cambió de manos mientras se
+  // generaba el escudo.
+  if (updated.length === 0) {
+    throw new Error(
+      'Conflict: the guild changed while regenerating the coat of arms — please refresh and try again',
+    )
+  }
 
   return { coatOfArmsSvg: svg }
 }

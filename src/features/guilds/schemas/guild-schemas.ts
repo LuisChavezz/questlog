@@ -147,6 +147,10 @@ export const regenerateInviteCodeSchema = z.object({
   guildId: z.string().min(1),
 })
 
+export type RegenerateInviteCodeValues = z.infer<
+  typeof regenerateInviteCodeSchema
+>
+
 // ─── Esquema de regeneración de escudo de armas ───────────────────────────────
 
 /** Esquema de entrada para regenerar (o generar por primera vez) el escudo de armas de un guild */
