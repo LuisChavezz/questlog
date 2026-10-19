@@ -39,13 +39,13 @@ Other scripts: `db:migrate` (apply), `db:push`, `db:pull`, `db:studio`, `db:seed
 
 ### Standing constraint
 
-Do not start the dev server, do not issue localhost requests, and do not run seed / reset / migration-apply commands. **Generating** a migration file is fine; applying it is the human's call. Verification here is read-only: types, tests, and code review — not a running app.
+Live verification is allowed: running the dev server and driving it with Playwright / the browser against localhost. Applying migrations and running `db:seed` / reset stays the human's call. **Generating** a migration file is fine.
 
 ## Conventions
 
 - **Path alias:** `#/*` → `src/*` is canonical (it is the Node `imports` entry, so it resolves at runtime too). `@/*` also resolves via `tsconfig.json` but is not for new code. Relative imports inside a feature slice (`../schemas/…`) are normal.
 - **Prettier:** `semi: false`, `singleQuote: true`, `trailingComma: 'all'` — trailing commas _everywhere_ Prettier can place them, function parameter and argument lists included. That `prettier.config.js` and `eslint.config.js` themselves use semicolons and double quotes is not a precedent: they are ESLint-ignored config, not source.
-- **Language split** (the most frequently botched convention here): identifiers, types, filenames → **English**; code comments and commit messages → **Spanish**; user-facing UI strings and thrown error messages that reach the UI → **English**. Filenames are kebab-case, components PascalCase, hooks `use-*.ts`. Residual violations survive in `features/guilds/api/get-guild.ts` (`inicioSemana`, `inicioDeHoy`) and a Spanish throw in `create-guild.ts` — fix opportunistically, don't copy.
+- **Language split** (the most frequently botched convention here): identifiers, types, filenames → **English**; code comments and commit messages → **Spanish**; user-facing UI strings and thrown error messages that reach the UI → **English**. Filenames are kebab-case, components PascalCase, hooks `use-*.ts`. Residual violations survive in `features/guilds/api/get-guild.ts` (`inicioSemana`, `inicioDeHoy`) — fix opportunistically, don't copy.
 - **TypeScript:** `strict` + `noUnusedLocals` + `noUnusedParameters` (an unused symbol fails the build) and `verbatimModuleSyntax` (type-only imports must be written `import type`).
 - **Tailwind v4, tokens only** (`bg-background`, `text-foreground`, `border-border`, `text-destructive`, …). Never hardcode colors. There is no `tailwind.config.*` — tokens live in `src/styles.css` under `:root` / `.dark` with `@custom-variant dark (&:is(.dark *))`. The palette is **Claude warm-grays + violet accent**; the `--nord-*` variable _names_ are leftovers from the original Nord palette and no longer hold Nord values. Default typeface is Anthropic Serif (`anthropic-fonts`).
 - **UI primitives** in `src/components/ui/` are shadcn-style (new-york) over Radix + CVA. Add new ones there with the same CVA + `cn()` shape.
@@ -71,15 +71,16 @@ update-quest.handler.ts    ← all business logic; takes already-authenticated u
 update-quest.handler.test.ts
 ```
 
-12 handlers are extracted today (all mutating quest/guild endpoints plus the two activity readers). Read-only server fns without a handler (`get-quests`, `get-guild`, `create-guild`, `join-guild`, …) have no unit tests. New mutating endpoints should follow the pair.
+14 handlers are extracted today (every mutating quest/guild endpoint except `create-guild` and `join-guild`, plus the two activity readers); `regenerate-invite-code` is one of them. Server fns without a handler (`get-quests`, `get-guild`, `create-guild`, `join-guild`, …) have no unit tests. The invite-code generator lives once in `features/guilds/api/invite-code.ts` (`generateUniqueInviteCode`), shared by `create-guild` and `regenerate-invite-code`. New mutating endpoints should follow the pair.
 
 ### Authorization model
 
 Authority lives in **shared predicates**, not in `WHERE` clauses. `features/guilds/role-labels.ts` is the single source of truth used by both the UI (to show/hide actions) and the server (final authority); everything derives from `isGuildOwner(guilds.owner_id, userId)` — ownership is structural, never inferred from `guild_members.role`, so a role drift can't become a bypass.
 
 - **Personal quests** (`guildId` NULL): only the creator may touch them, and they may not carry an assignee or supervisor.
-- **Guild quests, two axes.** Axis 1 (`canManageGuildQuest`) covers title/description/priority/tags/due date/delete/reassign — creator, Guild Master (owner), or an Officer (`admin`) over quests created by a _strictly lower_ rank (`ROLE_RANK`: owner 0, admin 1, member 2 — lower number, higher authority). Axis 2 (`canUpdateGuildQuestStatus`) adds the assignee and supervisor, status only. `canCreateGuildQuest` is owner/admin only.
+- **Guild quests, two axes.** Axis 1 (`canManageGuildQuest`) covers title/description/priority/tags/due date/delete/reassign — creator, Guild Master (owner), or an Officer (`admin`) over quests created by a _strictly lower_ rank (`ROLE_RANK`: owner 0, admin 1, member 2 — lower number, higher authority). The creator's rank is resolved inside the predicate: a creator who is the current `guilds.owner_id` ranks as owner whatever `guild_members.role` says, and a creator who is no longer a member (`creatorRole` null) ranks as member, so the Guild Master and Officers keep managing their quests. Hence `null` must mean "not a member", never "forgot to resolve". Axis 2 (`canUpdateGuildQuestStatus`) adds the assignee and supervisor, status only. `canCreateGuildQuest` is owner/admin only.
 - `updateQuestHandler` deliberately reads the quest row **without** an owner filter, because the predicates — not the query — hold the authority.
+- **Leaving a guild** (`leave-guild`) mirrors `remove-guild-member`: unlocked pre-check, then a locked re-check of the leaver's membership and the structural owner, delete the membership, and clear the leaver's `assignee_id` / `supervisor_id` on that guild's quests in the same transaction.
 - **What a user sees in `/quests`** is defined once in `features/quests/api/visible-quests-filter.ts`: own personal quests, plus guild quests where they are creator/assignee/supervisor **and** still a member. `get-quests` and `get-quest-guilds` must describe exactly the same row set or the UI paints sections with no quests, or quests with no section.
 
 ### Concurrency: pre-check, locked re-check, deadlock retry
@@ -147,7 +148,7 @@ Auth wiring: `lib/auth.ts` (server) ↔ `lib/auth-client.ts` (browser) — the c
 
 ### Testing
 
-28 test files, Vitest 4. There is **no global Vitest config**: each file declares its environment with a line-1 pragma — `// @vitest-environment node` for handlers and logic, `// @vitest-environment jsdom` for components and hooks.
+35 test files, Vitest 4. There is **no global Vitest config**: each file declares its environment with a line-1 pragma — `// @vitest-environment node` for handlers and logic, `// @vitest-environment jsdom` for components and hooks.
 
 - `src/test/drizzle-stub.ts` is a chainable, _thenable_ Drizzle fake. Mock with `vi.mock('#/db', async () => ({ db: (await import('#/test/drizzle-stub')).dbStub }))`, then `enqueueSelect/Update/Insert/Delete` results in the order the handler issues its queries (one queue per operation; `transaction(cb)` calls `cb(dbStub)`, so locked reads share the queues). `enqueueError('update', err)` simulates an engine failure mid-sequence — that's how the deadlock paths are covered.
 - `getDbCalls()` returns `{ op, table, set, values, where, orderBy, locked, returning }` per operation, which is how tests assert on things absent from the return value: that a re-read used `.for('update')`, what the audit log wrote, the `WHERE` scope of a DELETE, or that a paginated query carried its tiebreaker.
