@@ -35,8 +35,8 @@ function writes() {
   return getDbCalls().filter((call) => call.op !== 'select')
 }
 
-// Guild resuelto en la comprobación previa + chequeo de unicidad del código
-// generado (sin colisión).
+// Guild resuelto en la comprobación previa. El chequeo de unicidad del código
+// generado lo encola cada test aparte (con o sin colisión).
 function enqueueGuild(ownerId = OWNER) {
   enqueueSelect([{ id: GUILD, ownerId }])
 }
