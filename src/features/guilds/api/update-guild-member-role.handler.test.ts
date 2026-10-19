@@ -3,11 +3,17 @@
 // prueba `updateGuildMemberRoleHandler` directamente, con `#/db` mockeado por el
 // stub encadenable y `resolveGuildBySlugOrThrow` mockeado (su acceso a BD se
 // testea aparte). Cubre la autorización owner-only, la inmutabilidad del rol del
-// owner por esta vía y el gate de returning() cuando el objetivo no es miembro.
+// owner por esta vía, el objetivo que no es miembro y la reverificación TOCTOU
+// bajo bloqueo frente a una transferencia de propiedad concurrente.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { guildMembers } from '#/db/schema'
-import { enqueueUpdate, getDbCalls, resetDbStub } from '#/test/drizzle-stub'
+import { guildMembers, guilds } from '#/db/schema'
+import {
+  enqueueSelect,
+  enqueueUpdate,
+  getDbCalls,
+  resetDbStub,
+} from '#/test/drizzle-stub'
 import type { AssignableGuildRole } from '../schemas/guild-schemas'
 import { resolveGuildBySlugOrThrow } from './resolve-guild-or-throw'
 import { updateGuildMemberRoleHandler } from './update-guild-member-role.handler'
@@ -36,12 +42,30 @@ function setupGuild(ownerId = OWNER) {
   })
 }
 
+/**
+ * Encola las lecturas/escrituras de un cambio de rol completo. Por defecto el
+ * estado bloqueado es idéntico al previo (sin carrera) y el UPDATE afecta a una
+ * fila; cada override simula un cambio concurrente en ese punto exacto.
+ */
+function enqueueRoleChangeFlow(
+  opts: {
+    locked?: { id: string }[]
+    currentOwnerId?: string
+    updated?: { id: string }[]
+  } = {},
+) {
+  enqueueSelect([{ id: 'membership-1' }]) // lectura previa del objetivo
+  enqueueSelect(opts.locked ?? [{ id: 'membership-1' }]) // relectura bloqueada
+  enqueueSelect([{ ownerId: opts.currentOwnerId ?? OWNER }]) // owner estructural
+  enqueueUpdate(opts.updated ?? [{ id: 'membership-1' }])
+}
+
 afterEach(() => {
   resetDbStub()
   vi.clearAllMocks()
 })
 
-describe('updateGuildMemberRoleHandler', () => {
+describe('updateGuildMemberRoleHandler — comprobación previa', () => {
   it('propaga Not Found cuando el guild no existe', async () => {
     vi.mocked(resolveGuildBySlugOrThrow).mockRejectedValue(
       new Error('Not Found: guild not found'),
@@ -54,7 +78,7 @@ describe('updateGuildMemberRoleHandler', () => {
 
   it('el owner promueve a un Member a Officer', async () => {
     setupGuild()
-    enqueueUpdate([{ id: 'membership-1' }])
+    enqueueRoleChangeFlow()
 
     await expect(
       updateGuildMemberRoleHandler(payload(MEMBER, 'admin'), OWNER),
@@ -63,27 +87,11 @@ describe('updateGuildMemberRoleHandler', () => {
 
   it('el owner degrada a un Officer a Member', async () => {
     setupGuild()
-    enqueueUpdate([{ id: 'membership-1' }])
+    enqueueRoleChangeFlow()
 
     await expect(
       updateGuildMemberRoleHandler(payload('u-admin', 'member'), OWNER),
     ).resolves.toEqual({ userId: 'u-admin', role: 'member' })
-  })
-
-  it('escribe el rol pedido sobre guild_members y confirma con returning', async () => {
-    setupGuild()
-    enqueueUpdate([{ id: 'membership-1' }])
-
-    await updateGuildMemberRoleHandler(payload(MEMBER, 'admin'), OWNER)
-
-    const calls = getDbCalls()
-    expect(calls).toHaveLength(1)
-    expect(calls[0]).toMatchObject({
-      op: 'update',
-      table: guildMembers,
-      set: { role: 'admin' },
-      returning: true,
-    })
   })
 
   it('lanza Forbidden cuando quien cambia el rol no es el owner', async () => {
@@ -108,10 +116,97 @@ describe('updateGuildMemberRoleHandler', () => {
 
   it('lanza Not Found cuando el objetivo no es miembro del guild', async () => {
     setupGuild()
-    enqueueUpdate([]) // returning() vacío: no había fila que actualizar
+    enqueueSelect([]) // la lectura previa no encuentra al objetivo
 
     await expect(
       updateGuildMemberRoleHandler(payload('u-ghost'), OWNER),
     ).rejects.toThrow('Not Found: member not found in this guild')
+    expect(getDbCalls().filter((call) => call.op !== 'select')).toHaveLength(0)
+  })
+})
+
+describe('updateGuildMemberRoleHandler — reverificación TOCTOU bajo bloqueo', () => {
+  it('relee al objetivo CON bloqueo y el owner SIN bloqueo, antes de escribir', async () => {
+    setupGuild()
+    enqueueRoleChangeFlow()
+
+    await updateGuildMemberRoleHandler(payload(MEMBER, 'admin'), OWNER)
+
+    const calls = getDbCalls()
+    expect(calls).toHaveLength(4)
+    expect(calls[0]).toMatchObject({
+      op: 'select',
+      table: guildMembers,
+      locked: false,
+    })
+    expect(calls[1]).toMatchObject({
+      op: 'select',
+      table: guildMembers,
+      locked: true,
+    })
+    // Owner estructural releído deliberadamente SIN bloqueo (MVCC) para no
+    // invertir el orden guilds → guild_members de transfer-guild-ownership.
+    expect(calls[2]).toMatchObject({
+      op: 'select',
+      table: guilds,
+      locked: false,
+    })
+    expect(calls[3]).toMatchObject({
+      op: 'update',
+      table: guildMembers,
+      set: { role: 'admin' },
+      returning: true,
+    })
+  })
+
+  it('aborta con Conflict si una transferencia hizo owner al objetivo', async () => {
+    setupGuild()
+    enqueueRoleChangeFlow({
+      // La transferencia concurrente confirmó antes de que tomáramos el
+      // bloqueo: escribir aquí dejaría al nuevo owner con role = 'member'.
+      currentOwnerId: MEMBER,
+    })
+
+    await expect(
+      updateGuildMemberRoleHandler(payload(MEMBER, 'member'), OWNER),
+    ).rejects.toThrow(
+      'Conflict: guild ownership changed — please refresh and try again',
+    )
+    expect(getDbCalls().filter((call) => call.op === 'update')).toHaveLength(0)
+  })
+
+  it('aborta con Conflict si el solicitante dejó de ser el owner', async () => {
+    setupGuild()
+    enqueueRoleChangeFlow({ currentOwnerId: 'u-new-owner' })
+
+    await expect(
+      updateGuildMemberRoleHandler(payload(MEMBER, 'admin'), OWNER),
+    ).rejects.toThrow(
+      'Conflict: guild ownership changed — please refresh and try again',
+    )
+    expect(getDbCalls().filter((call) => call.op === 'update')).toHaveLength(0)
+  })
+
+  it('aborta con Conflict si el objetivo salió del guild antes del bloqueo', async () => {
+    setupGuild()
+    enqueueRoleChangeFlow({ locked: [] })
+
+    await expect(
+      updateGuildMemberRoleHandler(payload(MEMBER, 'admin'), OWNER),
+    ).rejects.toThrow(
+      'Conflict: this member is no longer in the guild — please refresh and try again',
+    )
+    expect(getDbCalls().filter((call) => call.op === 'update')).toHaveLength(0)
+  })
+
+  it('aborta con Conflict si el UPDATE no afecta a ninguna fila', async () => {
+    setupGuild()
+    enqueueRoleChangeFlow({ updated: [] })
+
+    await expect(
+      updateGuildMemberRoleHandler(payload(MEMBER, 'admin'), OWNER),
+    ).rejects.toThrow(
+      'Conflict: this member is no longer in the guild — please refresh and try again',
+    )
   })
 })
