@@ -9,57 +9,62 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AuthRouteImport } from './routes/_auth'
-import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as InviteCodeRouteImport } from './routes/invite/$code'
-import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
-import { Route as AuthLoginRouteImport } from './routes/_auth/login'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AppQuestsRouteImport } from './routes/_app/quests'
+import { Route as AuthLoginRouteImport } from './routes/_auth/login'
+import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
+import { Route as InviteCodeRouteImport } from './routes/invite/$code'
 import { Route as AppGuildsIndexRouteImport } from './routes/_app/guilds/index'
-import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppGuildsSlugRouteImport } from './routes/_app/guilds/$slug'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppGuildsSlugIndexRouteImport } from './routes/_app/guilds/$slug/index'
-import { Route as AppGuildsSlugSettingsRouteImport } from './routes/_app/guilds/$slug/settings'
-import { Route as AppGuildsSlugQuestsRouteImport } from './routes/_app/guilds/$slug/quests'
 import { Route as AppGuildsSlugMembersRouteImport } from './routes/_app/guilds/$slug/members'
+import { Route as AppGuildsSlugQuestsRouteImport } from './routes/_app/guilds/$slug/quests'
+import { Route as AppGuildsSlugSettingsRouteImport } from './routes/_app/guilds/$slug/settings'
 
-const AuthRoute = AuthRouteImport.update({
-  id: '/_auth',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AuthRoute = AuthRouteImport.update({
+  id: '/_auth',
   getParentRoute: () => rootRouteImport,
-} as any)
-const InviteCodeRoute = InviteCodeRouteImport.update({
-  id: '/invite/$code',
-  path: '/invite/$code',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRegisterRoute = AuthRegisterRouteImport.update({
-  id: '/register',
-  path: '/register',
-  getParentRoute: () => AuthRoute,
-} as any)
-const AuthLoginRoute = AuthLoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => AuthRoute,
 } as any)
 const AppQuestsRoute = AppQuestsRouteImport.update({
   id: '/quests',
   path: '/quests',
   getParentRoute: () => AppRoute,
 } as any)
+const AuthLoginRoute = AuthLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => AuthRoute,
+} as any)
+const AuthRegisterRoute = AuthRegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => AuthRoute,
+} as any)
+const InviteCodeRoute = InviteCodeRouteImport.update({
+  id: '/invite/$code',
+  path: '/invite/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppGuildsIndexRoute = AppGuildsIndexRouteImport.update({
   id: '/guilds/',
   path: '/guilds/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppGuildsSlugRoute = AppGuildsSlugRouteImport.update({
+  id: '/guilds/$slug',
+  path: '/guilds/$slug',
   getParentRoute: () => AppRoute,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
@@ -67,19 +72,14 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppGuildsSlugRoute = AppGuildsSlugRouteImport.update({
-  id: '/guilds/$slug',
-  path: '/guilds/$slug',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppGuildsSlugIndexRoute = AppGuildsSlugIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppGuildsSlugRoute,
 } as any)
-const AppGuildsSlugSettingsRoute = AppGuildsSlugSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
+const AppGuildsSlugMembersRoute = AppGuildsSlugMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
   getParentRoute: () => AppGuildsSlugRoute,
 } as any)
 const AppGuildsSlugQuestsRoute = AppGuildsSlugQuestsRouteImport.update({
@@ -87,9 +87,9 @@ const AppGuildsSlugQuestsRoute = AppGuildsSlugQuestsRouteImport.update({
   path: '/quests',
   getParentRoute: () => AppGuildsSlugRoute,
 } as any)
-const AppGuildsSlugMembersRoute = AppGuildsSlugMembersRouteImport.update({
-  id: '/members',
-  path: '/members',
+const AppGuildsSlugSettingsRoute = AppGuildsSlugSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => AppGuildsSlugRoute,
 } as any)
 
@@ -193,11 +193,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_auth': {
-      id: '/_auth'
-      path: ''
+    '/': {
+      id: '/'
+      path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof AuthRouteImport
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app': {
@@ -207,33 +207,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
+    '/_auth': {
+      id: '/_auth'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/invite/$code': {
-      id: '/invite/$code'
-      path: '/invite/$code'
-      fullPath: '/invite/$code'
-      preLoaderRoute: typeof InviteCodeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_auth/register': {
-      id: '/_auth/register'
-      path: '/register'
-      fullPath: '/register'
-      preLoaderRoute: typeof AuthRegisterRouteImport
-      parentRoute: typeof AuthRoute
-    }
-    '/_auth/login': {
-      id: '/_auth/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof AuthLoginRouteImport
-      parentRoute: typeof AuthRoute
     }
     '/_app/quests': {
       id: '/_app/quests'
@@ -242,11 +221,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppQuestsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_auth/login': {
+      id: '/_auth/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof AuthLoginRouteImport
+      parentRoute: typeof AuthRoute
+    }
+    '/_auth/register': {
+      id: '/_auth/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof AuthRegisterRouteImport
+      parentRoute: typeof AuthRoute
+    }
+    '/invite/$code': {
+      id: '/invite/$code'
+      path: '/invite/$code'
+      fullPath: '/invite/$code'
+      preLoaderRoute: typeof InviteCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/guilds/': {
       id: '/_app/guilds/'
       path: '/guilds'
       fullPath: '/guilds/'
       preLoaderRoute: typeof AppGuildsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/guilds/$slug': {
+      id: '/_app/guilds/$slug'
+      path: '/guilds/$slug'
+      fullPath: '/guilds/$slug'
+      preLoaderRoute: typeof AppGuildsSlugRouteImport
       parentRoute: typeof AppRoute
     }
     '/api/auth/$': {
@@ -256,13 +263,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/guilds/$slug': {
-      id: '/_app/guilds/$slug'
-      path: '/guilds/$slug'
-      fullPath: '/guilds/$slug'
-      preLoaderRoute: typeof AppGuildsSlugRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/guilds/$slug/': {
       id: '/_app/guilds/$slug/'
       path: '/'
@@ -270,11 +270,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppGuildsSlugIndexRouteImport
       parentRoute: typeof AppGuildsSlugRoute
     }
-    '/_app/guilds/$slug/settings': {
-      id: '/_app/guilds/$slug/settings'
-      path: '/settings'
-      fullPath: '/guilds/$slug/settings'
-      preLoaderRoute: typeof AppGuildsSlugSettingsRouteImport
+    '/_app/guilds/$slug/members': {
+      id: '/_app/guilds/$slug/members'
+      path: '/members'
+      fullPath: '/guilds/$slug/members'
+      preLoaderRoute: typeof AppGuildsSlugMembersRouteImport
       parentRoute: typeof AppGuildsSlugRoute
     }
     '/_app/guilds/$slug/quests': {
@@ -284,11 +284,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppGuildsSlugQuestsRouteImport
       parentRoute: typeof AppGuildsSlugRoute
     }
-    '/_app/guilds/$slug/members': {
-      id: '/_app/guilds/$slug/members'
-      path: '/members'
-      fullPath: '/guilds/$slug/members'
-      preLoaderRoute: typeof AppGuildsSlugMembersRouteImport
+    '/_app/guilds/$slug/settings': {
+      id: '/_app/guilds/$slug/settings'
+      path: '/settings'
+      fullPath: '/guilds/$slug/settings'
+      preLoaderRoute: typeof AppGuildsSlugSettingsRouteImport
       parentRoute: typeof AppGuildsSlugRoute
     }
   }
