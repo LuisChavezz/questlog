@@ -113,8 +113,13 @@ export const canTransferOwnership = canChangeMemberRole
 
 /**
  * Datos de la quest necesarios para decidir permisos. `creatorRole` es el rol
- * del creador dentro del guild, o `null` si ya no es miembro (en cuyo caso un
- * Officer no puede demostrar que lo supera en rango).
+ * del creador según guild_members, o `null` si ya no es miembro del guild.
+ *
+ * OJO: `null` significa "no miembro", no "desconocido". Quien arme este objeto
+ * debe haber resuelto de verdad la membresía del creador (en el servidor,
+ * pasándolo en `relatedUserIds`; en la UI, contra el roster completo): un
+ * creador omitido por error se leería como ex-miembro y quedaría gestionable
+ * por los Officers.
  */
 export interface GuildQuestPermissionTarget {
   // Creador de la quest (quests.owner_id)
@@ -125,12 +130,31 @@ export interface GuildQuestPermissionTarget {
 }
 
 /**
+ * Rango efectivo del creador de una quest para la jerarquía del eje 1:
+ * - Si es el dueño estructural actual (guilds.owner_id), cuenta como owner,
+ *   diga lo que diga guild_members.role — un drift del rol no puede volver
+ *   gestionables por un Officer las quests del Guild Master.
+ * - Si ya no es miembro (`creatorRole` null), cuenta como member (el rango más
+ *   bajo), para que el Guild Master y los Officers puedan seguir gestionando
+ *   sus quests.
+ * - Si no, su rol en guild_members.
+ */
+function resolveCreatorRole(
+  viewer: Pick<GuildMemberViewer, 'ownerId'>,
+  quest: Pick<GuildQuestPermissionTarget, 'creatorId' | 'creatorRole'>,
+): GuildRole {
+  if (isGuildOwner(viewer.ownerId, quest.creatorId)) return 'owner'
+  return quest.creatorRole ?? 'member'
+}
+
+/**
  * Eje 1 — Gestión completa (título, descripción, prioridad, tags, fecha, borrado
  * y reasignación de asignado/supervisor):
  * - El creador de la quest, siempre.
  * - El Guild Master (dueño estructural), sobre cualquier quest del guild.
  * - Un Officer (admin) solo sobre quests creadas por un rango estrictamente
- *   inferior — mismo criterio de jerarquía que `canRemoveMember`.
+ *   inferior — mismo criterio de jerarquía que `canRemoveMember`. El rango del
+ *   creador sale de `resolveCreatorRole` (owner estructural / ex-miembro).
  */
 export function canManageGuildQuest(
   viewer: GuildMemberViewer,
@@ -138,8 +162,11 @@ export function canManageGuildQuest(
 ): boolean {
   if (quest.creatorId === viewer.viewerId) return true
   if (isGuildOwner(viewer.ownerId, viewer.viewerId)) return true
-  if (viewer.viewerRole === 'admin' && quest.creatorRole != null) {
-    return ROLE_RANK[quest.creatorRole] > ROLE_RANK[viewer.viewerRole]
+  if (viewer.viewerRole === 'admin') {
+    return (
+      ROLE_RANK[resolveCreatorRole(viewer, quest)] >
+      ROLE_RANK[viewer.viewerRole]
+    )
   }
   return false
 }
