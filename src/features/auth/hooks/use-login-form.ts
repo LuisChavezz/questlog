@@ -36,7 +36,9 @@ export function useLoginForm() {
         return
       }
 
-      await navigate({ to: getSafeRedirect(redirect) })
+      // `href` (no `to`) para que el search del deep link llegue intacto:
+      // getSafeRedirect garantiza que es una ruta interna, nunca una URL.
+      await navigate({ href: getSafeRedirect(redirect) })
     },
   })
 

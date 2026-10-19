@@ -52,14 +52,63 @@ export const authSearchSchema = z.object({
 
 export type AuthSearch = z.infer<typeof authSearchSchema>
 
+// Destino por defecto cuando no hay `redirect` o no es seguro
+const DEFAULT_REDIRECT = '/quests'
+
+// Origen ficticio contra el que se resuelve el destino para comprobar que una
+// ruta "interna" no acaba apuntando a otro host. `.invalid` está reservado y
+// nunca resuelve, así que no puede coincidir con un origen real.
+const REDIRECT_CHECK_ORIGIN = 'http://questlog.invalid'
+
+// Barras invertidas y caracteres de control: el navegador normaliza "\" a "/"
+// y descarta tabuladores y saltos de línea al parsear una URL, así que
+// "/\evil.com" o "/\t/evil.com" acaban siendo "//evil.com" (protocol-relative).
+function hasUnsafeRedirectChars(value: string): boolean {
+  for (const char of value) {
+    const code = char.charCodeAt(0)
+    if (char === '\\' || code < 0x20 || code === 0x7f) return true
+  }
+  return false
+}
+
 /**
  * Devuelve un destino de redirección seguro. Solo se permiten rutas internas
- * que empiezan con "/" (y no "//", que el navegador interpreta como URL
- * protocol-relative). Así se evita un open-redirect hacia dominios externos.
+ * (path + search + hash) que empiezan con una única "/". Se rechazan, tanto en
+ * crudo como tras decodificar una vez (para cubrir "%5C" o "%2F%2F"): "//"
+ * (URL protocol-relative), barras invertidas, caracteres de control y URLs
+ * absolutas. Como última red, el destino se resuelve contra un origen ficticio
+ * y debe seguir en él. Así se evita un open-redirect hacia dominios externos.
  */
 export function getSafeRedirect(redirect: string | undefined): string {
-  if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
-    return redirect
+  if (!redirect) return DEFAULT_REDIRECT
+
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(redirect)
+  } catch {
+    // Secuencia de escape malformada: no se intenta adivinar qué quería decir
+    return DEFAULT_REDIRECT
   }
-  return '/quests'
+
+  for (const candidate of [redirect, decoded]) {
+    if (
+      !candidate.startsWith('/') ||
+      candidate.startsWith('//') ||
+      hasUnsafeRedirectChars(candidate)
+    ) {
+      return DEFAULT_REDIRECT
+    }
+  }
+
+  try {
+    if (
+      new URL(redirect, REDIRECT_CHECK_ORIGIN).origin !== REDIRECT_CHECK_ORIGIN
+    ) {
+      return DEFAULT_REDIRECT
+    }
+  } catch {
+    return DEFAULT_REDIRECT
+  }
+
+  return redirect
 }
