@@ -15,7 +15,15 @@ import { db } from '#/db'
 import { guildMembers, guilds, quests } from '#/db/schema'
 import { isGuildOwner } from '../role-labels'
 import type { LeaveGuildValues } from '../schemas/guild-schemas'
+import { withDeadlockRetry } from '#/lib/server/deadlock-retry'
 import { resolveGuildBySlugOrThrow } from './resolve-guild-or-throw'
+
+// Conflicto genérico de la salida: la membresía cambió entre la comprobación
+// previa y la escritura. Se comparte con el reintento por deadlock para que un
+// choque de bloqueos irresoluble se vea igual que cualquier otra carrera
+// perdida, en vez de filtrar el error crudo de Postgres.
+const MEMBERSHIP_CHANGED_CONFLICT =
+  'Conflict: your membership changed while leaving — please refresh and try again'
 
 export async function leaveGuildHandler(
   data: LeaveGuildValues,
@@ -59,86 +67,96 @@ export async function leaveGuildHandler(
   // la limpieza. transfer-guild-ownership y delete-guild toman `guilds` y
   // después `guild_members`; aquí `guilds` nunca se bloquea, así que contra
   // ellos no se invierte ningún orden.
-  return db.transaction(async (tx) => {
-    // Bloquear (FOR UPDATE) la membresía de quien sale. Una transferencia que lo
-    // promueva a owner debe escribir esta misma fila, así que el bloqueo nos
-    // serializa contra ella.
-    const lockedMemberships = await tx
-      .select({ id: guildMembers.id })
-      .from(guildMembers)
-      .where(
-        and(
-          eq(guildMembers.guildId, guild.id),
-          eq(guildMembers.userId, userId),
-        ),
-      )
-      .limit(1)
-      .for('update')
+  //
+  // Riesgo de deadlock (el mismo que tiene remove-guild-member): esta
+  // transacción retiene la membresía y después toca `quests`, al revés que
+  // update-quest (quests → guild_members), y la cascada de delete-guild puede
+  // cruzarse con ambas. Ningún orden los satisface a todos, así que se absorbe
+  // reintentando la transacción una vez con `withDeadlockRetry`.
+  return withDeadlockRetry(
+    () =>
+      db.transaction(async (tx) => {
+        // Bloquear (FOR UPDATE) la membresía de quien sale. Una transferencia que lo
+        // promueva a owner debe escribir esta misma fila, así que el bloqueo nos
+        // serializa contra ella.
+        const lockedMemberships = await tx
+          .select({ id: guildMembers.id })
+          .from(guildMembers)
+          .where(
+            and(
+              eq(guildMembers.guildId, guild.id),
+              eq(guildMembers.userId, userId),
+            ),
+          )
+          .limit(1)
+          .for('update')
 
-    // La comprobación previa acaba de pasar: si ya no hay membresía, otra
-    // transacción la borró entre medias (p. ej. una expulsión simultánea).
-    if (lockedMemberships.length === 0) {
-      throw new Error(
-        'Conflict: your membership changed while leaving — please refresh and try again',
-      )
-    }
+        // La comprobación previa acaba de pasar: si ya no hay membresía, otra
+        // transacción la borró entre medias (p. ej. una expulsión simultánea).
+        if (lockedMemberships.length === 0) {
+          throw new Error(MEMBERSHIP_CHANGED_CONFLICT)
+        }
 
-    // Releer el owner estructural DESPUÉS de tomar el bloqueo: así refleja una
-    // transferencia ya confirmada. Lectura sin bloqueo (MVCC) a propósito, para
-    // no invertir el orden de bloqueos respecto a transfer-guild-ownership
-    // (guilds → guild_members); como la transferencia escribe la fila de quien
-    // la recibe, el bloqueo de arriba ya nos serializa contra ella.
-    const lockedGuilds = await tx
-      .select({ ownerId: guilds.ownerId })
-      .from(guilds)
-      .where(eq(guilds.id, guild.id))
-      .limit(1)
+        // Releer el owner estructural DESPUÉS de tomar el bloqueo: así refleja una
+        // transferencia ya confirmada. Lectura sin bloqueo (MVCC) a propósito, para
+        // no invertir el orden de bloqueos respecto a transfer-guild-ownership
+        // (guilds → guild_members); como la transferencia escribe la fila de quien
+        // la recibe, el bloqueo de arriba ya nos serializa contra ella.
+        const lockedGuilds = await tx
+          .select({ ownerId: guilds.ownerId })
+          .from(guilds)
+          .where(eq(guilds.id, guild.id))
+          .limit(1)
 
-    // Si el guild desapareció (borrado concurrente) o quien sale es ahora el
-    // owner (una transferencia ganó la carrera), abortar en vez de dejar el
-    // guild con un owner sin fila de membresía.
-    if (
-      lockedGuilds.length === 0 ||
-      isGuildOwner(lockedGuilds[0].ownerId, userId)
-    ) {
-      throw new Error(
-        'Conflict: you are now the guild owner — please refresh and try again',
-      )
-    }
+        // Si el guild desapareció (borrado concurrente) o quien sale es ahora el
+        // owner (una transferencia ganó la carrera), abortar en vez de dejar el
+        // guild con un owner sin fila de membresía.
+        if (
+          lockedGuilds.length === 0 ||
+          isGuildOwner(lockedGuilds[0].ownerId, userId)
+        ) {
+          throw new Error(
+            'Conflict: you are now the guild owner — please refresh and try again',
+          )
+        }
 
-    // Borrar la membresía; returning() confirma que la fila seguía ahí al
-    // escribir (con el bloqueo tomado no debería poder faltar).
-    const removed = await tx
-      .delete(guildMembers)
-      .where(
-        and(
-          eq(guildMembers.guildId, guild.id),
-          eq(guildMembers.userId, userId),
-        ),
-      )
-      .returning({ id: guildMembers.id })
+        // Borrar la membresía; returning() confirma que la fila seguía ahí al
+        // escribir (con el bloqueo tomado no debería poder faltar).
+        const removed = await tx
+          .delete(guildMembers)
+          .where(
+            and(
+              eq(guildMembers.guildId, guild.id),
+              eq(guildMembers.userId, userId),
+            ),
+          )
+          .returning({ id: guildMembers.id })
 
-    if (removed.length === 0) {
-      throw new Error(
-        'Conflict: your membership changed while leaving — please refresh and try again',
-      )
-    }
+        if (removed.length === 0) {
+          throw new Error(MEMBERSHIP_CHANGED_CONFLICT)
+        }
 
-    // Limpiar asignado/supervisor, exactamente como remove-guild-member: quien
-    // sale deja de ser miembro, así que ninguna quest del guild puede seguir
-    // apuntándolo en esos campos (si volviera a unirse, recuperaría en silencio
-    // el eje 2 sobre ellas). Misma transacción que el borrado de la membresía, y
-    // solo quests DE ESTE guild; la autoría (ownerId) no se toca.
-    await tx
-      .update(quests)
-      .set({ assigneeId: null })
-      .where(and(eq(quests.guildId, guild.id), eq(quests.assigneeId, userId)))
+        // Limpiar asignado/supervisor, exactamente como remove-guild-member: quien
+        // sale deja de ser miembro, así que ninguna quest del guild puede seguir
+        // apuntándolo en esos campos (si volviera a unirse, recuperaría en silencio
+        // el eje 2 sobre ellas). Misma transacción que el borrado de la membresía, y
+        // solo quests DE ESTE guild; la autoría (ownerId) no se toca.
+        await tx
+          .update(quests)
+          .set({ assigneeId: null })
+          .where(
+            and(eq(quests.guildId, guild.id), eq(quests.assigneeId, userId)),
+          )
 
-    await tx
-      .update(quests)
-      .set({ supervisorId: null })
-      .where(and(eq(quests.guildId, guild.id), eq(quests.supervisorId, userId)))
+        await tx
+          .update(quests)
+          .set({ supervisorId: null })
+          .where(
+            and(eq(quests.guildId, guild.id), eq(quests.supervisorId, userId)),
+          )
 
-    return { slug: data.slug }
-  })
+        return { slug: data.slug }
+      }),
+    MEMBERSHIP_CHANGED_CONFLICT,
+  )
 }
