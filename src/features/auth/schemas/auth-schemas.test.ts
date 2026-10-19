@@ -17,6 +17,11 @@ describe('getSafeRedirect — destinos internos', () => {
     '/guilds/my-guild/quests?status=todo&overdue=true',
     '/quests#top',
     '/quests?tag=a%20b',
+    // Barra invertida codificada en el SEARCH: valor de filtro legítimo
+    '/quests?q=C%5Cpath',
+    // '//' en el search o el hash no cambia de host
+    '/quests?next=%2F%2Fevil.com',
+    '/quests#//section',
   ])('conserva %s', (target) => {
     expect(getSafeRedirect(target)).toBe(target)
   })
@@ -46,6 +51,9 @@ describe('getSafeRedirect — destinos externos o ambiguos', () => {
     ['esquema javascript', 'javascript:alert(1)'],
     ['ruta relativa sin barra', 'quests'],
     ['escape malformado', '/%E0%A4%A'],
+    ['protocol-relative con search', '//evil.com?next=/quests'],
+    ['barra invertida con hash', '/\\evil.com#section'],
+    ['barra invertida codificada con search', '/%5Cevil.com?q=1'],
   ])('rechaza %s', (_label, target) => {
     expect(getSafeRedirect(target)).toBe(DEFAULT)
   })
