@@ -79,5 +79,8 @@
       "esbuild",
       "lightningcss"
     ]
+  },
+  "overrides": {
+    "@tanstack/router-core": "1.171.35"
   }
 }
