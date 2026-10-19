@@ -110,12 +110,19 @@ export async function updateGuildMemberRoleHandler(
       .where(eq(guilds.id, guild.id))
       .limit(1)
 
+    // El guild desapareció entre la comprobación previa y el bloqueo (borrado
+    // concurrente): no queda ningún rol que cambiar.
+    if (lockedGuilds.length === 0) {
+      throw new Error(
+        'Conflict: this guild no longer exists — please refresh and try again',
+      )
+    }
+
     // Mismo predicado que la comprobación previa, ahora contra el owner fresco:
     // el solicitante sigue siendo el owner y el objetivo no lo es. Como el check
     // de arriba acaba de pasar, si falla aquí solo puede ser por un cambio
-    // concurrente (o un borrado del guild): conflicto en vez de "Forbidden".
+    // concurrente: conflicto en vez de "Forbidden".
     if (
-      lockedGuilds.length === 0 ||
       !canChangeMemberRole(
         { viewerId: requesterId, ownerId: lockedGuilds[0].ownerId },
         { userId: data.userId },
