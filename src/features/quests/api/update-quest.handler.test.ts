@@ -70,7 +70,8 @@ function setupGuildQuest(opts: {
   viewerId: string
   viewerRole: GuildRole
   creatorId: string
-  creatorRole: GuildRole
+  // `null` = el creador ya no es miembro: no aparece en roleByUserId
+  creatorRole: GuildRole | null
   assigneeId?: string | null
   supervisorId?: string | null
   // Valores PRE-update de los campos rastreados, para las aserciones de la
@@ -97,7 +98,9 @@ function setupGuildQuest(opts: {
       ownerId: GM,
     },
     roleByUserId: new Map<string, GuildRole>([
-      [opts.creatorId, opts.creatorRole],
+      ...(opts.creatorRole
+        ? [[opts.creatorId, opts.creatorRole] as const]
+        : []),
       ...(opts.memberIds ?? []).map((id) => [id, 'member'] as const),
     ]),
   }
@@ -554,5 +557,57 @@ describe('updateQuestHandler — reintento por deadlock', () => {
     await expect(updateQuestHandler(payload(), USER)).rejects.toBe(fkViolation)
 
     expect(getDbCalls().filter((call) => call.op === 'update')).toHaveLength(1)
+  })
+})
+
+describe('updateQuestHandler — creador que ya no es miembro', () => {
+  // El resolver no devuelve rol para el creador (ya no tiene fila de
+  // membresía): el predicado debe tratarlo como rango member.
+  it('un Officer gestiona la quest y el creador viaja en relatedUserIds en ambas lecturas', async () => {
+    await expect(
+      setupGuildQuest({
+        data: payload(),
+        viewerId: 'u-officer',
+        viewerRole: 'admin',
+        creatorId: 'u-ex-member',
+        creatorRole: null,
+        expectAllow: true,
+      }),
+    ).resolves.toBeDefined()
+
+    expect(vi.mocked(resolveGuildQuestAuth).mock.calls[0][2]).toContain(
+      'u-ex-member',
+    )
+    expect(vi.mocked(resolveLockedGuildQuestAuth).mock.calls[0][3]).toContain(
+      'u-ex-member',
+    )
+  })
+
+  it('el Guild Master gestiona la quest', async () => {
+    await expect(
+      setupGuildQuest({
+        data: payload(),
+        viewerId: GM,
+        viewerRole: 'owner',
+        creatorId: 'u-ex-member',
+        creatorRole: null,
+        expectAllow: true,
+      }),
+    ).resolves.toBeDefined()
+  })
+
+  it('un Member sigue sin poder gestionarla', async () => {
+    await expect(
+      setupGuildQuest({
+        data: payload(),
+        viewerId: 'u-member',
+        viewerRole: 'member',
+        creatorId: 'u-ex-member',
+        creatorRole: null,
+        expectAllow: false,
+      }),
+    ).rejects.toThrow(
+      'Forbidden: you do not have permission to modify this quest',
+    )
   })
 })

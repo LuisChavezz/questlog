@@ -41,7 +41,8 @@ function setupGuildDelete(opts: {
   viewerId: string
   viewerRole: GuildRole
   creatorId: string
-  creatorRole: GuildRole
+  // `null` = el creador ya no es miembro: no aparece en roleByUserId
+  creatorRole: GuildRole | null
   expectAllow: boolean
 }) {
   const questRow = {
@@ -56,9 +57,9 @@ function setupGuildDelete(opts: {
       viewerRole: opts.viewerRole,
       ownerId: GM,
     },
-    roleByUserId: new Map<string, GuildRole>([
-      [opts.creatorId, opts.creatorRole],
-    ]),
+    roleByUserId: new Map<string, GuildRole>(
+      opts.creatorRole ? [[opts.creatorId, opts.creatorRole]] : [],
+    ),
   }
   vi.mocked(resolveGuildQuestAuth).mockResolvedValue(ctx)
   vi.mocked(resolveLockedGuildQuestAuth).mockResolvedValue(ctx)
@@ -189,5 +190,40 @@ describe('deleteQuestHandler — bitácora de auditoría y cascada', () => {
       fk.reference().columns.some((col) => col.name === 'quest_id'),
     )
     expect(questFk?.onDelete).toBe('cascade')
+  })
+})
+
+describe('deleteQuestHandler — creador que ya no es miembro', () => {
+  it('un Officer la borra y el creador viaja en relatedUserIds en ambas lecturas', async () => {
+    await expect(
+      setupGuildDelete({
+        viewerId: 'u-officer',
+        viewerRole: 'admin',
+        creatorId: 'u-ex-member',
+        creatorRole: null,
+        expectAllow: true,
+      }),
+    ).resolves.toBeDefined()
+
+    expect(vi.mocked(resolveGuildQuestAuth).mock.calls[0][2]).toContain(
+      'u-ex-member',
+    )
+    expect(vi.mocked(resolveLockedGuildQuestAuth).mock.calls[0][3]).toContain(
+      'u-ex-member',
+    )
+  })
+
+  it('un Member sigue sin poder borrarla', async () => {
+    await expect(
+      setupGuildDelete({
+        viewerId: 'u-member',
+        viewerRole: 'member',
+        creatorId: 'u-ex-member',
+        creatorRole: null,
+        expectAllow: false,
+      }),
+    ).rejects.toThrow(
+      'Forbidden: you do not have permission to delete this quest',
+    )
   })
 })
