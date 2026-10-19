@@ -7,48 +7,13 @@
 // una escritura de una sola fila de `guilds` que no deja filas relacionadas
 // inconsistentes, así que basta con que el motor no encuentre fila si la
 // propiedad cambió de manos entre la comprobación previa y la escritura.
-import { randomBytes } from 'node:crypto'
-
 import { and, eq } from 'drizzle-orm'
 
 import { db } from '#/db'
 import { guilds } from '#/db/schema'
 import { isGuildOwner } from '../role-labels'
 import type { RegenerateInviteCodeValues } from '../schemas/guild-schemas'
-
-// Alfabeto sin caracteres ambiguos (excluye 0/O, 1/I/l) — idéntico al de create-guild
-const INVITE_CODE_ALPHABET =
-  '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz'
-const INVITE_CODE_LENGTH = 8
-
-function generateBaseCode(): string {
-  const bytes = randomBytes(INVITE_CODE_LENGTH * 2)
-  let code = ''
-  for (let i = 0; i < bytes.length && code.length < INVITE_CODE_LENGTH; i++) {
-    const limit =
-      Math.floor(256 / INVITE_CODE_ALPHABET.length) *
-      INVITE_CODE_ALPHABET.length
-    if (bytes[i] < limit) {
-      code += INVITE_CODE_ALPHABET[bytes[i] % INVITE_CODE_ALPHABET.length]
-    }
-  }
-  return code.length === INVITE_CODE_LENGTH ? code : generateBaseCode()
-}
-
-async function generateUniqueInviteCode(): Promise<string> {
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const code = generateBaseCode()
-    const existingGuilds = await db
-      .select({ id: guilds.id })
-      .from(guilds)
-      .where(eq(guilds.inviteCode, code))
-      .limit(1)
-    if (existingGuilds.length === 0) return code
-  }
-  throw new Error(
-    'Could not generate a unique invite code after several attempts',
-  )
-}
+import { generateUniqueInviteCode } from './invite-code'
 
 export async function regenerateInviteCodeHandler(
   data: RegenerateInviteCodeValues,
