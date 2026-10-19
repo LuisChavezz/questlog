@@ -73,24 +73,32 @@ function hasUnsafeRedirectChars(value: string): boolean {
 
 /**
  * Devuelve un destino de redirección seguro. Solo se permiten rutas internas
- * (path + search + hash) que empiezan con una única "/". Se rechazan, tanto en
- * crudo como tras decodificar una vez (para cubrir "%5C" o "%2F%2F"): "//"
- * (URL protocol-relative), barras invertidas, caracteres de control y URLs
- * absolutas. Como última red, el destino se resuelve contra un origen ficticio
- * y debe seguir en él. Así se evita un open-redirect hacia dominios externos.
+ * (path + search + hash) cuyo path empieza con una única "/". Sobre el PATH —
+ * en crudo y tras decodificarlo una vez, para cubrir "%5C" o "%2F%2F"— se
+ * rechazan "//" (URL protocol-relative), barras invertidas y caracteres de
+ * control: es la única parte que el navegador puede reinterpretar como otro
+ * host. El search y el hash no se inspeccionan así, porque un valor como
+ * "?q=C%5Cpath" es un deep link legítimo. Como última red, el destino COMPLETO
+ * se resuelve contra un origen ficticio y debe seguir en él (eso descarta
+ * además las URLs absolutas). Así se evita un open-redirect hacia dominios
+ * externos.
  */
 export function getSafeRedirect(redirect: string | undefined): string {
   if (!redirect) return DEFAULT_REDIRECT
 
-  let decoded: string
+  // Path = todo lo anterior al primer "?" o "#"
+  const pathEnd = redirect.search(/[?#]/)
+  const path = pathEnd === -1 ? redirect : redirect.slice(0, pathEnd)
+
+  let decodedPath: string
   try {
-    decoded = decodeURIComponent(redirect)
+    decodedPath = decodeURIComponent(path)
   } catch {
     // Secuencia de escape malformada: no se intenta adivinar qué quería decir
     return DEFAULT_REDIRECT
   }
 
-  for (const candidate of [redirect, decoded]) {
+  for (const candidate of [path, decodedPath]) {
     if (
       !candidate.startsWith('/') ||
       candidate.startsWith('//') ||
