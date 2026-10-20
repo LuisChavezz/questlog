@@ -133,4 +133,37 @@ describe('resolveAuthOrigins', () => {
       }
     }
   })
+
+  describe('BETTER_AUTH_TRUSTED_ORIGINS (solo desarrollo)', () => {
+    const LOCAL_ORIGINS = 'http://b.localhost:3001,http://c.localhost:3001'
+
+    it('falla al arrancar si está definida en producción', () => {
+      expect(() =>
+        resolveAuthOrigins({
+          VERCEL_ENV: 'production',
+          BETTER_AUTH_URL: 'https://questlog-neon.vercel.app',
+          BETTER_AUTH_TRUSTED_ORIGINS: LOCAL_ORIGINS,
+        }),
+      ).toThrow('BETTER_AUTH_TRUSTED_ORIGINS must not be set on Vercel')
+    })
+
+    it('falla al arrancar si está definida en un preview', () => {
+      expect(() =>
+        resolveAuthOrigins({
+          VERCEL_ENV: 'preview',
+          VERCEL_URL: PREVIEW_URL,
+          BETTER_AUTH_TRUSTED_ORIGINS: LOCAL_ORIGINS,
+        }),
+      ).toThrow('BETTER_AUTH_TRUSTED_ORIGINS must not be set on Vercel')
+    })
+
+    it('se permite en desarrollo', () => {
+      expect(() =>
+        resolveAuthOrigins({
+          NODE_ENV: 'development',
+          BETTER_AUTH_TRUSTED_ORIGINS: LOCAL_ORIGINS,
+        }),
+      ).not.toThrow()
+    })
+  })
 })
