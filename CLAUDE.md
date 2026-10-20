@@ -35,7 +35,7 @@ Database (drizzle-kit reads `DATABASE_URL` from `.env.local`, then `.env`; schem
 npx drizzle-kit generate
 ```
 
-Other scripts: `db:migrate` (apply), `db:push`, `db:pull`, `db:studio`, `db:seed` (wipes auth tables, creates `test@questlog.dev` / `Test1234!`). Required env vars: `DATABASE_URL`, `BETTER_AUTH_SECRET`; optional `BETTER_AUTH_URL` (defaults to `http://localhost:3000`).
+Other scripts: `db:migrate` (apply), `db:push`, `db:pull`, `db:studio`, `db:seed` (wipes auth tables, creates `test@questlog.dev` / `Test1234!`). Required env vars: `DATABASE_URL`, `BETTER_AUTH_SECRET`; `BETTER_AUTH_URL` (defaults to `http://localhost:3000` in development; **required in production**, where `lib/auth.ts` throws at startup without it); optional `BETTER_AUTH_TRUSTED_ORIGINS` (comma-separated, development only — see Auth wiring).
 
 ### Standing constraint
 
@@ -136,6 +136,8 @@ Per-field Zod schemas are defined once per feature (`features/quests/schemas/que
 File-based routes under `src/routes/`. Two **pathless layout routes** gate everything with a server-side `beforeLoad`: `_app.tsx` redirects to `/login` without a session (and puts `session` on route context), `_auth.tsx` sends logged-in users to the `redirect` search param when `getSafeRedirect` accepts it, and to `/quests` otherwise. Authenticated pages go under `_app/`, guest pages under `_auth/`; `/invite/$code` is deliberately outside both (public invite preview). `_app/guilds/$slug.tsx` is itself a layout route: it preloads `guildQueryOptions(slug)` and renders the shared header + `<Outlet/>` for `index` / `members` / `quests` / `settings`.
 
 Auth wiring: `lib/auth.ts` (server) ↔ `lib/auth-client.ts` (browser) — the client's `inferAdditionalFields` mirrors the server's `user.additionalFields` **by hand**, so adding a user field means editing both. `getServerSession()` (`lib/server/session.ts`) is what the guards call; the HTTP handler is mounted at `routes/api/auth/$.ts`.
+
+`better-auth` is pinned **exactly** (`1.6.33`): since 1.6.16, `/sign-in/email` and `/sign-up/email` validate `Origin`/`Referer` against `trustedOrigins` even without cookies, so an origin missing from the list gets a 403. The policy lives in one place at the top of `lib/auth.ts`: `PRODUCTION_HOSTS` (the production aliases on Vercel) plus `PREVIEW_HOST_PATTERNS` (only this project's preview URLs, `questlog-?????????-<scope>.vercel.app` per commit and `questlog-git-*-<scope>.vercel.app` per branch — never `*.vercel.app`). Local origins (`localhost:3001`, the `*.localhost` hosts of multi-session tests) are never hardcoded: they come from `BETTER_AUTH_TRUSTED_ORIGINS`, which Better Auth appends natively. `baseURL` is resolved per environment: Vercel previews (`VERCEL_ENV=preview`) use a dynamic `allowedHosts` config limited to `PREVIEW_HOST_PATTERNS`, because the shared `BETTER_AUTH_URL` cannot match every preview URL; production requires `BETTER_AUTH_URL`; development falls back to localhost.
 
 ### UI patterns worth knowing before adding UI
 
