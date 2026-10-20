@@ -14,6 +14,7 @@ export type AuthOriginsEnv = {
   VERCEL_URL?: string
   VERCEL_BRANCH_URL?: string
   BETTER_AUTH_URL?: string
+  BETTER_AUTH_TRUSTED_ORIGINS?: string
 }
 
 export type AuthOrigins = {
@@ -32,6 +33,18 @@ export const PRODUCTION_ORIGINS = [
 const DEVELOPMENT_BASE_URL = 'http://localhost:3000'
 
 export function resolveAuthOrigins(env: AuthOriginsEnv): AuthOrigins {
+  // BETTER_AUTH_TRUSTED_ORIGINS es solo para desarrollo, pero Better Auth la lee
+  // en cualquier entorno: definida en Vercel ampliaría en silencio los orígenes
+  // de producción o de un preview. Se aborta al arrancar en vez de aceptarla.
+  if (
+    (env.VERCEL_ENV === 'production' || env.VERCEL_ENV === 'preview') &&
+    env.BETTER_AUTH_TRUSTED_ORIGINS
+  ) {
+    throw new Error(
+      `BETTER_AUTH_TRUSTED_ORIGINS must not be set on Vercel (${env.VERCEL_ENV}). It is for local development only.`,
+    )
+  }
+
   // Preview de Vercel: se confía solo en las URLs de ESTE deployment, que
   // Vercel inyecta por deployment (sin esquema). BETTER_AUTH_URL se ignora a
   // propósito: es un único valor compartido por todos los previews, así que no
