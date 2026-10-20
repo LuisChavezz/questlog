@@ -11,25 +11,33 @@
  *  4. Genera un manifiesto tipado en `src/features/user/avatar-catalog.ts`.
  *
  * Uso: `npx tsx scripts/build-avatars.ts`.
+ *
+ * Opción `--out <dir>`: escribe los WebP y el manifiesto (`avatar-catalog.ts`)
+ * dentro de `<dir>` en vez de `public/avatars/` y `src/features/user/`, y solo
+ * borra ese directorio. Sirve para validar el resultado (p. ej. tras actualizar
+ * sharp) sin tocar los archivos versionados.
+ *
  * No toca la base de datos ni requiere el servidor de desarrollo.
  */
 import { readdir, mkdir, writeFile, rm } from 'node:fs/promises'
-import { join, extname, relative } from 'node:path'
+import { join, extname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parseArgs } from 'node:util'
 
 import sharp from 'sharp'
 
 // Rutas relativas a la raíz del proyecto (este archivo vive en scripts/)
 const PROJECT_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const SOURCE_DIR = join(PROJECT_ROOT, 'assets-source', 'avatars')
-const OUTPUT_DIR = join(PROJECT_ROOT, 'public', 'avatars')
-const MANIFEST_PATH = join(
-  PROJECT_ROOT,
-  'src',
-  'features',
-  'user',
-  'avatar-catalog.ts',
-)
+
+// Directorio alternativo de salida (`--out`), relativo al directorio actual
+const { values: args } = parseArgs({ options: { out: { type: 'string' } } })
+const CUSTOM_OUT_DIR = args.out ? resolve(args.out) : undefined
+
+const OUTPUT_DIR = CUSTOM_OUT_DIR ?? join(PROJECT_ROOT, 'public', 'avatars')
+const MANIFEST_PATH = CUSTOM_OUT_DIR
+  ? join(CUSTOM_OUT_DIR, 'avatar-catalog.ts')
+  : join(PROJECT_ROOT, 'src', 'features', 'user', 'avatar-catalog.ts')
 
 // Parámetros de salida
 const OUTPUT_SIZE = 128
