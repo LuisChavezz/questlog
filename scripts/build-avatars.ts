@@ -10,7 +10,7 @@
  *     escribiéndola en `public/avatars/` con nombres secuenciales limpios.
  *  4. Genera un manifiesto tipado en `src/features/user/avatar-catalog.ts`.
  *
- * Uso: `npx tsx scripts/build-avatars.ts` (o `pnpm tsx ...`).
+ * Uso: `npx tsx scripts/build-avatars.ts`.
  * No toca la base de datos ni requiere el servidor de desarrollo.
  */
 import { readdir, mkdir, writeFile, rm } from 'node:fs/promises'
