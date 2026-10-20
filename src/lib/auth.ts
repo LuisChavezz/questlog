@@ -31,9 +31,35 @@ const TRUSTED_ORIGINS = [...PRODUCTION_HOSTS, ...PREVIEW_HOST_PATTERNS].map(
   (host) => `https://${host}`,
 )
 
+// URL base de Better Auth según el entorno:
+// - Preview de Vercel (VERCEL_ENV=preview): cada deployment tiene su propia
+//   URL, así que una BETTER_AUTH_URL fija (compartida por todos los previews)
+//   no sirve. Se resuelve por request desde el header Host, aceptando solo los
+//   hosts de preview de este proyecto; cualquier otro host falla en vez de
+//   caer en otra URL.
+// - Producción: BETTER_AUTH_URL es obligatoria. Sin ella, callbacks y
+//   redirects apuntarían a localhost en silencio, así que se aborta al arrancar.
+// - Desarrollo: BETTER_AUTH_URL o localhost:3000.
+function resolveBaseURL() {
+  if (process.env.VERCEL_ENV === 'preview') {
+    return { allowedHosts: PREVIEW_HOST_PATTERNS, protocol: 'https' as const }
+  }
+
+  const baseURL = process.env.BETTER_AUTH_URL
+  if (baseURL) return baseURL
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'BETTER_AUTH_URL is not set. It is required in production so auth callbacks and redirects do not fall back to localhost.',
+    )
+  }
+
+  return 'http://localhost:3000'
+}
+
 // Configuración del servidor de autenticación con Better Auth + Drizzle (Postgres/Supabase)
 export const auth = betterAuth({
-  baseURL: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
+  baseURL: resolveBaseURL(),
   trustedOrigins: TRUSTED_ORIGINS,
   secret: process.env.BETTER_AUTH_SECRET,
   database: drizzleAdapter(db, {
