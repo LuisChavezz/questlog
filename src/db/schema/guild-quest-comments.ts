@@ -1,7 +1,7 @@
 // Esquema de guild_quest_comments — hilo plano de comentarios de una quest de
 // GUILD. Las quests personales (guildId NULL) no tienen comentarios: lo impiden
 // los handlers, no el esquema, porque el guild se deriva siempre vía `quests`.
-import { relations } from 'drizzle-orm'
+import { relations, sql } from 'drizzle-orm'
 import { index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 
 import { user } from '../auth-schema'
@@ -30,9 +30,14 @@ export const guildQuestComments = pgTable(
     // Precisión de milisegundos (3) a propósito: un `Date` de JS hace el viaje
     // de ida y vuelta exacto, así que el cursor (created_at, id) que el cliente
     // devuelve nunca pierde los microsegundos que `now()` guardaría por defecto.
+    //
+    // `clock_timestamp()` y no `now()`: `now()` es el inicio de la TRANSACCIÓN,
+    // y las publicaciones se serializan sobre `quests FOR UPDATE`. Un comentario
+    // que esperó el bloqueo quedaría fechado antes que otro confirmado mientras
+    // esperaba, y el hilo los mostraría en orden inverso al real.
     createdAt: timestamp('created_at', { withTimezone: true, precision: 3 })
       .notNull()
-      .defaultNow(),
+      .default(sql`clock_timestamp()`),
     // Momento de la última edición del cuerpo; NULL = nunca editado. Sin
     // historial de versiones: solo alimenta la marca "edited" de la UI.
     editedAt: timestamp('edited_at', { withTimezone: true, precision: 3 }),
