@@ -91,9 +91,10 @@ export async function updateQuestCommentHandler(
 
         const updatedRows = await tx
           .update(guildQuestComments)
-          // `now()` de Postgres, no un `Date` del servidor de la app: mismo reloj
-          // que `created_at`.
-          .set({ body: data.body, editedAt: sql`now()` })
+          // `clock_timestamp()` de Postgres, no un `Date` del servidor de la app
+          // ni `now()` (inicio de la transacción, que pudo esperar el bloqueo):
+          // mismo reloj que el default de `created_at`.
+          .set({ body: data.body, editedAt: sql`clock_timestamp()` })
           .where(
             and(
               eq(guildQuestComments.id, data.commentId),

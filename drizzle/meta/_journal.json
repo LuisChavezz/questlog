@@ -99,6 +99,13 @@
       "when": 1792615948969,
       "tag": "0013_guild_quest_comments",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792620566602,
+      "tag": "0014_guild_quest_comments_clock_timestamp",
+      "breakpoints": true
     }
   ]
 }

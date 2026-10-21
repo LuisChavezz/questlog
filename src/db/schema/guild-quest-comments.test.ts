@@ -6,7 +6,8 @@
 // cursor de paginación y el índice que lo recorre.
 import { describe, expect, it } from 'vitest'
 import { getTableName } from 'drizzle-orm'
-import { getTableConfig } from 'drizzle-orm/pg-core'
+import type { SQL } from 'drizzle-orm'
+import { getTableConfig, PgDialect } from 'drizzle-orm/pg-core'
 
 import { guildQuestComments } from '#/db/schema'
 
@@ -77,6 +78,15 @@ describe('guild_quest_comments — columnas del cursor', () => {
     expect(precisionOf('edited_at')).toBe(3)
     expect(column('created_at').notNull).toBe(true)
     expect(column('edited_at').notNull).toBe(false)
+  })
+
+  it('created_at toma clock_timestamp(), no now()', () => {
+    // `now()` es el inicio de la transacción: un comentario que esperó el
+    // bloqueo de la quest quedaría fechado antes que uno confirmado entre medias.
+    const defaultSql = new PgDialect().sqlToQuery(
+      column('created_at').default as SQL,
+    ).sql
+    expect(defaultSql).toBe('clock_timestamp()')
   })
 
   it('el índice del hilo recorre (quest_id, created_at, id) en ese orden', () => {

@@ -171,7 +171,7 @@ describe('updateQuestCommentHandler — gates', () => {
 })
 
 describe('updateQuestCommentHandler — quién edita', () => {
-  it('el autor edita su comentario y marca edited_at con now()', async () => {
+  it('el autor edita su comentario y marca edited_at con clock_timestamp()', async () => {
     setupPreCheck({ viewerId: MEMBER })
     enqueueAttempt()
     enqueueUpdate([
@@ -186,8 +186,10 @@ describe('updateQuestCommentHandler — quién edita', () => {
     const [write] = writes()
     expect(write.table).toBe(guildQuestComments)
     expect(write.set?.body).toBe('Edited body')
-    // `now()` de Postgres, no un Date de la app.
-    expect(dialect.sqlToQuery(write.set?.editedAt as SQL).sql).toBe('now()')
+    // `clock_timestamp()` de Postgres: ni un Date de la app ni `now()`.
+    expect(dialect.sqlToQuery(write.set?.editedAt as SQL).sql).toBe(
+      'clock_timestamp()',
+    )
     expect(dialect.sqlToQuery(write.where as SQL).params).toEqual([
       COMMENT,
       QUEST,
