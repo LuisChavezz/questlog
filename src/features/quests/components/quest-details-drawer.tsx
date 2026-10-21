@@ -2,8 +2,12 @@
  * QuestDetailsDrawer — panel lateral (Notion-style) con la vista expandida de
  * una quest. Reutiliza los mismos editores inline que la tabla, así que
  * editar aquí o en la fila mantiene la misma caché optimista sincronizada.
- * Los comentarios quedan explícitamente fuera de alcance: la sección al pie
- * solo reserva el layout para no tener que reestructurar cuando se agreguen.
+ *
+ * En quests de guild añade el hilo de comentarios: el hilo va DENTRO del cuerpo
+ * scrolleable, debajo de los campos, y el composer ocupa el pie fijo. Un único
+ * scroll en un panel de 24rem evita las trampas de scroll de dos áreas anidadas,
+ * y deja el comentario más reciente justo encima del composer. Las quests
+ * personales no tienen comentarios: sin pie.
  */
 import {
   Activity,
@@ -24,7 +28,12 @@ import {
   SheetTitle,
 } from '#/components/ui/sheet'
 import type { Quest } from '#/db/schema'
+import type { QuestCommentAuthor } from '#/features/quest-comments/api/quest-comment-item'
+import { QuestCommentComposer } from '#/features/quest-comments/components/quest-comment-composer'
+import { isQuestCommentInputEvent } from '#/features/quest-comments/components/quest-comment-input'
+import { QuestCommentsThread } from '#/features/quest-comments/components/quest-comments-thread'
 import { dateFormatter } from '#/lib/format-date'
+import { getUserInitials } from '#/lib/get-user-initials'
 import type { UpdateQuestValues } from '../schemas/quest-schemas'
 import {
   getQuestPermissions,
@@ -93,13 +102,28 @@ export function QuestDetailsDrawer({
         // el sitio en vez de cerrar y reabrir.
         onPointerDownOutside={(event) => {
           const target = event.target
-          if (target instanceof Element && target.closest(`[${QUEST_OPEN_TRIGGER_ATTR}]`)) {
+          if (
+            target instanceof Element &&
+            target.closest(`[${QUEST_OPEN_TRIGGER_ATTR}]`)
+          ) {
+            event.preventDefault()
+          }
+        }}
+        // Escape dentro del composer o de un editor de comentario no cierra el
+        // drawer: se perdería el foco (y, en la edición, el texto) de lo que se
+        // está escribiendo. Fuera de esos campos, Escape cierra como siempre.
+        onEscapeKeyDown={(event) => {
+          if (isQuestCommentInputEvent(event)) {
             event.preventDefault()
           }
         }}
       >
         {quest && (
+          // `key` por quest: al cambiar de quest con el drawer abierto, todo el
+          // estado local (editores inline, composer) se remonta en vez de
+          // arrastrarse a la quest siguiente.
           <QuestDetailsContent
+            key={quest.id}
             quest={quest}
             onUpdate={onUpdate}
             guildContext={guildContext}
@@ -125,10 +149,14 @@ function QuestDetailsContent({
   canManage: boolean
   canEditStatus: boolean
 }) {
-  const assignee = guildContext?.members.find((m) => m.userId === quest.assigneeId)
+  const assignee = guildContext?.members.find(
+    (m) => m.userId === quest.assigneeId,
+  )
   const supervisor = guildContext?.members.find(
     (m) => m.userId === quest.supervisorId,
   )
+  // Solo las quests de guild tienen comentarios.
+  const hasComments = guildContext !== undefined && quest.guildId !== null
 
   return (
     <div className="flex h-full flex-col">
@@ -253,15 +281,52 @@ function QuestDetailsContent({
               readOnly={!canManage}
             />
           </DetailField>
+
+          {hasComments && (
+            <section
+              aria-label="Comments"
+              className="flex flex-col gap-3 border-t border-border pt-6"
+            >
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <MessageSquare
+                  className="size-3.5 shrink-0 opacity-60"
+                  aria-hidden="true"
+                />
+                Comments
+              </span>
+              <QuestCommentsThread questId={quest.id} />
+            </section>
+          )}
         </div>
       </div>
 
-      {/* Reservado para la futura sección de comentarios/discusión — fuera de
-          alcance en esta iteración, solo se deja el espacio delimitado. */}
-      <div className="flex items-center gap-2 border-t border-border p-4 text-sm text-muted-foreground/60">
-        <MessageSquare className="size-4 shrink-0" aria-hidden="true" />
-        Comments coming soon
-      </div>
+      {hasComments && (
+        <div className="border-t border-border p-4">
+          <QuestCommentComposer
+            questId={quest.id}
+            currentAuthor={getCurrentAuthor(guildContext)}
+          />
+        </div>
+      )}
     </div>
   )
+}
+
+// Autor con el que se pinta el comentario optimista: el usuario actual, resuelto
+// contra el roster del guild. `null` si no aparece (el servidor lo corrige).
+function getCurrentAuthor(
+  guildContext: QuestsColumnsGuildContext | undefined,
+): QuestCommentAuthor | null {
+  const member = guildContext?.members.find(
+    (m) => m.userId === guildContext.currentUserId,
+  )
+  if (!member) return null
+
+  return {
+    id: member.userId,
+    name: member.name,
+    image: member.image ?? null,
+    avatarId: member.avatarId ?? null,
+    initials: member.initials ?? getUserInitials(member.name),
+  }
 }

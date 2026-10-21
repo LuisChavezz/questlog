@@ -106,8 +106,11 @@ Helpers: `resolveGuildQuestAuth` (unlocked) and `resolveLockedGuildQuestAuth` (l
 | `['quest-guilds']` (`QUEST_GUILDS_QUERY_KEY`)                                              | guild composition of that list |
 | `['guilds']`                                                                               | guild directory                |
 | `['guild', slug]` + `…, 'quests'` / `…, 'activity', 'recent'` / `…, 'activity', 'history'` | everything guild-scoped        |
+| `['quest-comments', questId]`                                                              | comment thread (infinite)      |
 
 `staleTime` is 20 s everywhere except `['quest-guilds']` (60 s).
+
+- `['quest-comments', questId]` is a **top-level sibling** too: a thread does not change when its quest or guild does, so it must not be swept by `['guild', slug]` prefix invalidation nor live under `['quests']`. Comment mutations invalidate only that key. Keyset pages (newest 20 first, "Load older" by `(created_at, id)` cursor); `canEdit` / `canDelete` come per comment from the server, evaluated with the shared predicates. In the drawer the thread lives in the scrollable body and the composer in the footer; the composer draft is a module-level in-memory `Map` per quest (`features/quest-comments/comment-drafts.ts`).
 
 - `['quest-guilds']` is a **sibling** of `['quests']`, not a child: mutation hooks patch and invalidate `['quests']` assuming it holds a `Quest[]`, and a nested key would be swept up by prefix invalidation.
 - Everything guild-scoped hangs off the `['guild', slug]` prefix, so invalidating that prefix refreshes stats, members, recent activity and history in one call.
