@@ -280,6 +280,13 @@ export const questPrioritySchema = z.enum(['low', 'medium', 'high', 'critical'])
 export const questTagsSchema = z.string().optional()
 
 /**
+ * Id de una quest (uuid de `quests.id`). Fuente única para toda entrada que
+ * identifique una quest: la actualización, los borrados y los endpoints de
+ * comentarios, que la reutilizan en vez de redefinir la regla.
+ */
+export const questIdSchema = z.string().uuid()
+
+/**
  * Id del guild al que pertenece la quest. NULL/ausente = quest personal.
  * Se valida como cadena no vacía; la existencia real y la membresía se verifican
  * en el servidor contra guild_members.
@@ -359,7 +366,7 @@ export type CreateQuestValues = z.infer<typeof createQuestSchema>
  * Pasar `undefined` omite el campo; pasar `''` en dueDate borra la fecha.
  */
 export const updateQuestSchema = z.object({
-  id: z.string().uuid(),
+  id: questIdSchema,
   title: questTitleSchema.optional(),
   description: questDescriptionSchema,
   status: questStatusSchema.optional(),
@@ -378,14 +385,14 @@ export type UpdateQuestValues = z.infer<typeof updateQuestSchema>
 
 /** Esquema para eliminar una quest individual por id. */
 export const deleteQuestSchema = z.object({
-  id: z.string().uuid(),
+  id: questIdSchema,
 })
 
 export type DeleteQuestValues = z.infer<typeof deleteQuestSchema>
 
 /** Esquema para eliminar múltiples quests por sus ids. */
 export const deleteQuestsSchema = z.object({
-  ids: z.array(z.string().uuid()).min(1),
+  ids: z.array(questIdSchema).min(1),
 })
 
 export type DeleteQuestsValues = z.infer<typeof deleteQuestsSchema>
