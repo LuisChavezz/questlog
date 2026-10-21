@@ -11,6 +11,10 @@ import { ThemeProvider } from '../components/providers/theme-provider'
 import { NotFoundPage } from '#/components/not-found-page'
 
 import appCss from '../styles.css?url'
+// Mismo archivo que referencia `opsz.css` para el subset latin normal: Vite lo
+// emite una sola vez con el mismo hash, así que el preload y el @font-face
+// apuntan a la misma URL.
+import newsreaderLatinWoff2 from '@fontsource-variable/newsreader/files/newsreader-latin-opsz-normal.woff2?url'
 
 import type { QueryClient } from '@tanstack/react-query'
 
@@ -33,6 +37,16 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       },
     ],
     links: [
+      // Preload de la tipografía por defecto (solo el subset latin normal): sin
+      // él, el navegador la descubre tras parsear el CSS y el texto cambia de
+      // la fuente de respaldo a Newsreader con un salto de layout.
+      {
+        rel: 'preload',
+        href: newsreaderLatinWoff2,
+        as: 'font',
+        type: 'font/woff2',
+        crossOrigin: 'anonymous',
+      },
       {
         rel: 'stylesheet',
         href: appCss,
