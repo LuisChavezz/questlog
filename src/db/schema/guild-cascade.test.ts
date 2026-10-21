@@ -10,12 +10,18 @@
 //   guilds → quests                   (guild_id CASCADE)
 //   guilds → guild_quest_activity_log (guild_id CASCADE)
 //   quests → guild_quest_activity_log (quest_id CASCADE)  [transitiva]
+//   quests → guild_quest_comments     (quest_id CASCADE)  [transitiva]
 import { describe, expect, it } from 'vitest'
 import { getTableName, is } from 'drizzle-orm'
 import { getTableConfig, PgTable } from 'drizzle-orm/pg-core'
 
 import * as schema from '#/db/schema'
-import { guildQuestActivityLog, guildMembers, quests } from '#/db/schema'
+import {
+  guildQuestActivityLog,
+  guildQuestComments,
+  guildMembers,
+  quests,
+} from '#/db/schema'
 
 // Devuelve la FK de `table` cuya columna origen es `columnName`.
 function foreignKeyOn(table: PgTable, columnName: string) {
@@ -73,6 +79,18 @@ describe('cascadas al borrar un guild', () => {
       referencesColumn: 'id',
       onDelete: 'cascade',
     })
+  })
+
+  it('guild_quest_comments.quest_id cae con la quest (CASCADE transitiva)', () => {
+    // Los comentarios no referencian `guilds` (no se desnormaliza guild_id):
+    // llegan al borrado del guild SOLO por esta rama, guild → quests →
+    // comentarios. Por eso no aparecen en el guard de completitud de abajo.
+    expect(describeForeignKey(guildQuestComments, 'quest_id')).toEqual({
+      references: 'quests',
+      referencesColumn: 'id',
+      onDelete: 'cascade',
+    })
+    expect(describeForeignKey(guildQuestComments, 'guild_id')).toBeNull()
   })
 
   it('no hay ninguna otra tabla apuntando a guilds fuera de esa cadena', () => {

@@ -117,12 +117,13 @@ Helpers: `resolveGuildQuestAuth` (unlocked) and `resolveLockedGuildQuestAuth` (l
 
 ### Database schema
 
-`src/db/schema/` is a directory with a barrel (`index.ts`) that re-exports `auth-schema` + `quests` + `guilds` + `guild-members` + `guild-quest-activity-log`; drizzle-kit points at that barrel. Inferred types (`Quest`, `NewQuest`, `QuestStatus`, `QuestPriority`, `GuildRole`, …) come from the tables and are the source of truth app-wide.
+`src/db/schema/` is a directory with a barrel (`index.ts`) that re-exports `auth-schema` + `quests` + `guilds` + `guild-members` + `guild-quest-activity-log` + `guild-quest-comments`; drizzle-kit points at that barrel. Inferred types (`Quest`, `NewQuest`, `QuestStatus`, `QuestPriority`, `GuildRole`, …) come from the tables and are the source of truth app-wide.
 
 Cascade decisions that carry meaning:
 
 - **`quests.guild_id` is `CASCADE`, not `set null`** — deleting a guild deletes its quests. `set null` would silently drop guild quests into their creator's personal list carrying an assignee and supervisor from a guild that no longer exists. Migration `0012` made the change; `src/db/schema/guild-cascade.test.ts` pins it by reflecting over the Drizzle schema.
 - **Activity log** (`guild_quest_activity_log`): guild quests only, written in the _same transaction_ as the insert/update. Exactly four audited fields — `status`, `assigneeId`, `supervisorId`, `dueDate` (title/description/priority/tags are excluded by decision). Deletion is never logged; rows die with the quest via `quest_id CASCADE`. Diffing lives in the pure `computeGuildQuestFieldChanges` — widening the audit means editing that function _and_ the `GuildQuestActivityField` union.
+- **Comments** (`guild_quest_comments`): `quest_id CASCADE`, `author_id SET NULL`, and deliberately **no `guild_id`** — the guild is derived through `quests`, so the table adds no edge to the `guilds` lock order and reaches a guild delete only via guild → quests → comments. `created_at` / `edited_at` are `timestamp(3)` so the `(created_at, id)` keyset cursor round-trips exactly through a JS `Date`.
 - Reads go through `guild-activity-log-query.ts`, shared by the Recent Activity card and the history modal. Its `ORDER BY created_at DESC, id DESC` tiebreaker is **load-bearing**: rows a multi-field update inserts in one transaction share `created_at` (`defaultNow()` resolves once per statement), and without the tiebreaker offset pagination skips or duplicates rows at a page boundary.
 
 ### Validation: single source of truth

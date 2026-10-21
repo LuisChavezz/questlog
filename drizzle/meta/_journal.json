@@ -92,6 +92,13 @@
       "when": 1785270860666,
       "tag": "0012_quests_guild_id_cascade",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792615948969,
+      "tag": "0013_guild_quest_comments",
+      "breakpoints": true
     }
   ]
 }

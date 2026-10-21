@@ -11,7 +11,8 @@
 //   guilds
 //     ├─ guild_members            (guild_id CASCADE)
 //     └─ quests                   (guild_id CASCADE)
-//          └─ guild_quest_activity_log (quest_id CASCADE)
+//          ├─ guild_quest_activity_log (quest_id CASCADE)
+//          └─ guild_quest_comments     (quest_id CASCADE)
 //     └─ guild_quest_activity_log (guild_id CASCADE)
 //
 // Por eso aquí se emite UNA sola escritura: `DELETE FROM guilds WHERE id = …`.
