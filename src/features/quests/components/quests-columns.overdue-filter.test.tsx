@@ -31,6 +31,7 @@ import { createQuestsColumns } from './quests-columns'
 // prueba; los permisos de guild no afectan al filtrado, así que se abren.
 const columns = createQuestsColumns(() => {}, {
   members: [],
+  currentUserId: 'user-1',
   onAssignmentChange: () => {},
   canManageQuest: () => true,
   canUpdateQuestStatus: () => true,
