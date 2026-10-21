@@ -199,3 +199,51 @@ export function canCreateGuildQuest(viewer: GuildMemberViewer): boolean {
     viewer.viewerRole === 'admin'
   )
 }
+
+// ─── Reglas de permisos de comentarios de quests de guild ─────────────────────
+// Leer y comentar exige solo ser miembro vigente del guild de la quest: esa
+// precondición la comprueban los handlers (resolveGuildQuestAuth), NO estos
+// predicados, que deciden únicamente sobre un comentario concreto.
+
+/**
+ * Datos del comentario necesarios para decidir permisos. `authorId` es `null`
+ * cuando la cuenta del autor se borró (FK con SET NULL): un comentario huérfano.
+ */
+export interface GuildQuestCommentPermissionTarget {
+  authorId: string | null
+}
+
+// ¿Es el observador el autor del comentario? Un huérfano no tiene autor, así que
+// nunca coincide con nadie.
+function isCommentAuthor(
+  viewer: Pick<GuildMemberViewer, 'viewerId'>,
+  comment: GuildQuestCommentPermissionTarget,
+): boolean {
+  return comment.authorId != null && comment.authorId === viewer.viewerId
+}
+
+/**
+ * ¿Puede el observador editar el comentario? Solo su autor — nadie edita el
+ * comentario de otro, ni siquiera el Guild Master. Un huérfano no lo edita nadie.
+ */
+export function canEditGuildQuestComment(
+  viewer: Pick<GuildMemberViewer, 'viewerId'>,
+  comment: GuildQuestCommentPermissionTarget,
+): boolean {
+  return isCommentAuthor(viewer, comment)
+}
+
+/**
+ * ¿Puede el observador borrar el comentario? Su autor, o el Guild Master (dueño
+ * estructural, vía `isGuildOwner`) sobre cualquiera — huérfanos incluidos, que
+ * así solo puede borrar él. Los Officers no moderan comentarios ajenos.
+ */
+export function canDeleteGuildQuestComment(
+  viewer: Pick<GuildMemberViewer, 'viewerId' | 'ownerId'>,
+  comment: GuildQuestCommentPermissionTarget,
+): boolean {
+  return (
+    isCommentAuthor(viewer, comment) ||
+    isGuildOwner(viewer.ownerId, viewer.viewerId)
+  )
+}

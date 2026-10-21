@@ -55,7 +55,7 @@ Live verification is allowed: running the dev server and driving it with Playwri
 
 ### Feature-sliced layout
 
-Domain code lives in `src/features/<name>/` split into `api/` (server functions + query options), `components/`, `hooks/`, `schemas/`. Features: `quests` (reference feature and landing destination), `guilds`, `auth`, `user`. Shared building blocks in `src/components/`, `src/lib/`, `src/hooks/`, `src/stores/`, `src/config/`.
+Domain code lives in `src/features/<name>/` split into `api/` (server functions + query options), `components/`, `hooks/`, `schemas/`. Features: `quests` (reference feature and landing destination), `guilds`, `quest-comments` (comment threads on guild quests), `auth`, `user`. Shared building blocks in `src/components/`, `src/lib/`, `src/hooks/`, `src/stores/`, `src/config/`.
 
 ### Data flow: server functions, not REST
 
@@ -71,7 +71,7 @@ update-quest.handler.ts    ← all business logic; takes already-authenticated u
 update-quest.handler.test.ts
 ```
 
-14 handlers are extracted today (every mutating quest/guild endpoint except `create-guild` and `join-guild`, plus the two activity readers); `regenerate-invite-code` is one of them. Server fns without a handler (`get-quests`, `get-guild`, `create-guild`, `join-guild`, …) have no unit tests. The invite-code generator lives once in `features/guilds/api/invite-code.ts` (`generateUniqueInviteCode`), shared by `create-guild` and `regenerate-invite-code`. New mutating endpoints should follow the pair.
+18 handlers are extracted today (every mutating quest/guild endpoint except `create-guild` and `join-guild`, the two activity readers, and the four `quest-comments` endpoints); `regenerate-invite-code` is one of them. Server fns without a handler (`get-quests`, `get-guild`, `create-guild`, `join-guild`, …) have no unit tests. The invite-code generator lives once in `features/guilds/api/invite-code.ts` (`generateUniqueInviteCode`), shared by `create-guild` and `regenerate-invite-code`. New mutating endpoints should follow the pair.
 
 ### Authorization model
 

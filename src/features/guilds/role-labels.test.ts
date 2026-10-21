@@ -6,7 +6,12 @@
 import { describe, expect, it } from 'vitest'
 
 import type { GuildRole } from '#/db/schema'
-import { canManageGuildQuest, canUpdateGuildQuestStatus } from './role-labels'
+import {
+  canDeleteGuildQuestComment,
+  canEditGuildQuestComment,
+  canManageGuildQuest,
+  canUpdateGuildQuestStatus,
+} from './role-labels'
 import type {
   GuildMemberViewer,
   GuildQuestPermissionTarget,
@@ -138,5 +143,91 @@ describe('canUpdateGuildQuestStatus', () => {
     expect(
       canUpdateGuildQuestStatus(viewer(ADMIN, 'admin'), quest(EX_MEMBER, null)),
     ).toBe(true)
+  })
+})
+
+// ─── Comentarios ──────────────────────────────────────────────────────────────
+
+describe('canEditGuildQuestComment', () => {
+  it('el autor edita su propio comentario, sea cual sea su rol', () => {
+    expect(
+      canEditGuildQuestComment(viewer(MEMBER, 'member'), { authorId: MEMBER }),
+    ).toBe(true)
+    expect(
+      canEditGuildQuestComment(viewer(OWNER, 'owner'), { authorId: OWNER }),
+    ).toBe(true)
+  })
+
+  it('nadie edita el comentario de otro — tampoco el Guild Master ni un Officer', () => {
+    const target = { authorId: MEMBER }
+
+    expect(canEditGuildQuestComment(viewer(OWNER, 'owner'), target)).toBe(false)
+    expect(canEditGuildQuestComment(viewer(ADMIN, 'admin'), target)).toBe(false)
+    expect(canEditGuildQuestComment(viewer(MEMBER_2, 'member'), target)).toBe(
+      false,
+    )
+  })
+
+  it('un comentario huérfano (autor borrado) no lo edita nadie', () => {
+    const orphan = { authorId: null }
+
+    expect(canEditGuildQuestComment(viewer(OWNER, 'owner'), orphan)).toBe(false)
+    expect(canEditGuildQuestComment(viewer(MEMBER, 'member'), orphan)).toBe(
+      false,
+    )
+  })
+})
+
+describe('canDeleteGuildQuestComment', () => {
+  it('el autor borra su propio comentario', () => {
+    expect(
+      canDeleteGuildQuestComment(viewer(MEMBER, 'member'), {
+        authorId: MEMBER,
+      }),
+    ).toBe(true)
+  })
+
+  it('el Guild Master borra comentarios ajenos', () => {
+    expect(
+      canDeleteGuildQuestComment(viewer(OWNER, 'owner'), { authorId: MEMBER }),
+    ).toBe(true)
+  })
+
+  it('un Officer NO borra comentarios ajenos, ni siquiera de un Member', () => {
+    expect(
+      canDeleteGuildQuestComment(viewer(ADMIN, 'admin'), { authorId: MEMBER }),
+    ).toBe(false)
+  })
+
+  it('un Member no borra comentarios ajenos', () => {
+    expect(
+      canDeleteGuildQuestComment(viewer(MEMBER_2, 'member'), {
+        authorId: MEMBER,
+      }),
+    ).toBe(false)
+  })
+
+  it('un huérfano solo lo borra el Guild Master', () => {
+    const orphan = { authorId: null }
+
+    expect(canDeleteGuildQuestComment(viewer(OWNER, 'owner'), orphan)).toBe(
+      true,
+    )
+    expect(canDeleteGuildQuestComment(viewer(ADMIN, 'admin'), orphan)).toBe(
+      false,
+    )
+    expect(canDeleteGuildQuestComment(viewer(MEMBER, 'member'), orphan)).toBe(
+      false,
+    )
+  })
+
+  it('el Guild Master se decide por la propiedad estructural, no por el rol', () => {
+    // Un rol `owner` derivado en guild_members sin ser guilds.owner_id no basta.
+    expect(
+      canDeleteGuildQuestComment(
+        { viewerId: ADMIN, ownerId: OWNER },
+        { authorId: MEMBER },
+      ),
+    ).toBe(false)
   })
 })
