@@ -21,6 +21,7 @@
     "db:seed": "tsx src/db/seed.ts"
   },
   "dependencies": {
+    "@fontsource-variable/newsreader": "5.3.0",
     "@paralleldrive/cuid2": "^3.3.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/match-sorter-utils": "9.2.6",
@@ -34,7 +35,6 @@
     "@tanstack/react-start": "1.168.61",
     "@tanstack/react-table": "8.21.3",
     "@tanstack/router-plugin": "1.168.43",
-    "anthropic-fonts": "^1.1.0",
     "better-auth": "1.6.33",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
