@@ -297,7 +297,7 @@ Ensure the following environment variables are set in production:
 | -------------------------------- | -------------------------------------------------------------------- |
 | `Invalid origin` on auth         | Set `BETTER_AUTH_URL` to the correct deployment URL                  |
 | Migrations fail                  | Ensure `DATABASE_URL` points to a reachable PostgreSQL instance      |
-| Fonts not loading                | The app loads Fraunces + Manrope from Google Fonts — check network   |
+| Fonts not loading                | Default typeface is self-hosted Newsreader (`@fontsource-variable/newsreader`, served from `/assets/`); Fraunces + Manrope still load from Google Fonts — check network |
 | Dark mode flashes on load        | The anti-FOUC script in `__root.tsx` reads Zustand's persisted theme |
 | Build fails with import errors   | Run `pnpm install` and ensure all dependencies are in `package.json` |
 
