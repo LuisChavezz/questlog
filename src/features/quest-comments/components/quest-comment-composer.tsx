@@ -3,15 +3,24 @@
  * guild. Enter inserta un salto de línea y Ctrl/Cmd+Enter publica. El borrador
  * vive en memoria por quest (`comment-drafts.ts`): sobrevive a cerrar el drawer
  * o cambiar de quest y se pierde al recargar.
+ *
+ * Pinta también el último error de una mutación de comentarios de ESTA quest
+ * (publicar, editar o borrar): está en el pie fijo del drawer, así que se ve
+ * aunque el hilo esté desplazado.
  */
-import { useState } from 'react'
 import { SendHorizontal } from 'lucide-react'
 
 import { Button } from '#/components/ui/button'
 import { Textarea } from '#/components/ui/textarea'
+import { authClient } from '#/lib/auth-client'
+import { getUserInitials } from '#/lib/get-user-initials'
 import { cn } from '#/lib/utils'
 import type { QuestCommentAuthor } from '../api/quest-comment-item'
-import { getCommentDraft, setCommentDraft } from '../comment-drafts'
+import {
+  setCommentDraft,
+  useCommentDraft,
+  useCommentError,
+} from '../comment-drafts'
 import { useCreateQuestComment } from '../hooks/use-create-quest-comment'
 import {
   COMMENT_BODY_MAX_LENGTH,
@@ -25,45 +34,43 @@ import {
 // A partir de cuántos caracteres (recortados) aparece el contador.
 const COUNTER_THRESHOLD = COMMENT_BODY_MAX_LENGTH - 200
 
-interface QuestCommentComposerProps {
-  questId: string
-  // Usuario actual, para pintar el comentario optimista con su nombre y avatar
-  currentAuthor: QuestCommentAuthor | null
+// Autor del comentario optimista: el usuario de la sesión, desde el mismo
+// `authClient.useSession()` que pinta el avatar del header (y que recibe el
+// parche optimista al cambiar de avatar). `null` mientras la sesión carga: el
+// servidor devuelve el autor real al confirmar.
+function useSessionAuthor(): QuestCommentAuthor | null {
+  const { data: session } = authClient.useSession()
+  const sessionUser = session?.user
+  if (!sessionUser) return null
+
+  return {
+    id: sessionUser.id,
+    name: sessionUser.name,
+    image: sessionUser.image ?? null,
+    avatarId: sessionUser.avatarId ?? null,
+    initials: getUserInitials(sessionUser.name, sessionUser.email),
+  }
 }
 
-export function QuestCommentComposer({
-  questId,
-  currentAuthor,
-}: QuestCommentComposerProps) {
-  // Se lee una vez al montar: el contenido del drawer se remonta por quest
-  // (`key={quest.id}`), así que cada quest arranca con SU borrador.
-  const [draft, setDraft] = useState(() => getCommentDraft(questId))
-  const [error, setError] = useState<string | null>(null)
-  const createComment = useCreateQuestComment(questId, currentAuthor)
+export function QuestCommentComposer({ questId }: { questId: string }) {
+  // El textarea lee del store por quest: un borrador restaurado tras un fallo
+  // aparece aquí aunque el fallo llegue después de cambiar de quest y volver.
+  const draft = useCommentDraft(questId)
+  const error = useCommentError(questId)
+  const createComment = useCreateQuestComment(questId, useSessionAuthor())
 
   const trimmedLength = draft.trim().length
   const canSubmit = commentBodySchema.safeParse(draft).success
   const isOverLimit = trimmedLength > COMMENT_BODY_MAX_LENGTH
 
-  const changeDraft = (value: string) => {
-    setDraft(value)
-    setCommentDraft(questId, value)
-  }
-
   const submit = () => {
     const parsed = commentBodySchema.safeParse(draft)
     if (!parsed.success) return
 
-    setError(null)
     // Se vacía en el acto: el comentario ya se ve como optimista en el hilo. Si
-    // el servidor lo rechaza, el hook devuelve el texto al borrador.
-    changeDraft('')
-    createComment.mutate(parsed.data, {
-      onError: (mutationError) => {
-        setError(mutationError.message)
-        setDraft(getCommentDraft(questId))
-      },
-    })
+    // el servidor lo rechaza, el hook lo devuelve al borrador (si sigue vacío).
+    setCommentDraft(questId, '')
+    createComment.mutate(parsed.data)
   }
 
   return (
@@ -75,6 +82,12 @@ export function QuestCommentComposer({
         submit()
       }}
     >
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+
       <Textarea
         {...{ [QUEST_COMMENT_INPUT_ATTR]: 'true' }}
         aria-label="Write a comment"
@@ -82,7 +95,7 @@ export function QuestCommentComposer({
         value={draft}
         aria-invalid={isOverLimit || undefined}
         className="max-h-40 min-h-16 text-sm"
-        onChange={(event) => changeDraft(event.target.value)}
+        onChange={(event) => setCommentDraft(questId, event.target.value)}
         onKeyDown={(event) => {
           if (isSubmitShortcut(event)) {
             event.preventDefault()
@@ -101,7 +114,9 @@ export function QuestCommentComposer({
               {trimmedLength}/{COMMENT_BODY_MAX_LENGTH}
             </span>
           ) : (
-            'Ctrl+Enter to send'
+            // Texto estático y neutral: detectar la plataforma al renderizar
+            // daría un HTML distinto en SSR y en el cliente (hydration mismatch).
+            '⌘/Ctrl+Enter to send'
           )}
         </span>
         <Button type="submit" size="sm" disabled={!canSubmit}>
@@ -109,12 +124,6 @@ export function QuestCommentComposer({
           Comment
         </Button>
       </div>
-
-      {error && (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      )}
     </form>
   )
 }

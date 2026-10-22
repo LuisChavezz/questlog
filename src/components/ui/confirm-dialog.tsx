@@ -42,6 +42,14 @@ interface ConfirmDialogProps {
    */
   confirmationPhrase?: string
   onConfirm: () => void | Promise<void>
+  /**
+   * Se reenvía al contenido del AlertDialog. Permite elegir adónde va el foco
+   * al cerrar cuando el trigger que lo abrió puede haber desaparecido (p. ej.
+   * una acción que retira de forma optimista el elemento que la disparó).
+   */
+  onCloseAutoFocus?: React.ComponentProps<
+    typeof AlertDialogContent
+  >['onCloseAutoFocus']
 }
 
 export function ConfirmDialog({
@@ -54,6 +62,7 @@ export function ConfirmDialog({
   variant = 'default',
   confirmationPhrase,
   onConfirm,
+  onCloseAutoFocus,
 }: ConfirmDialogProps) {
   const [isConfirming, setIsConfirming] = React.useState(false)
   const [confirmationText, setConfirmationText] = React.useState('')
@@ -97,7 +106,7 @@ export function ConfirmDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           {description ? (

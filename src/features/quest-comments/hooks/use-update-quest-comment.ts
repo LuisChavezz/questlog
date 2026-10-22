@@ -1,14 +1,18 @@
 // Hook de mutación para editar un comentario — con actualización optimista
-// sobre la caché infinita del hilo (`['quest-comments', questId]`).
+// sobre la caché infinita del hilo (`['quest-comments', questId]`). El error,
+// si lo hay, se publica en el store de la quest desde el `onError` de nivel de
+// hook, que corre para cada edición aunque se solapen varias.
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import {
+  findQuestComment,
   questCommentsQueryKey,
   replaceQuestComment,
   updateQuestCommentPages,
 } from '../api/quest-comments-query-options'
 import type { QuestCommentsCache } from '../api/quest-comments-query-options'
 import { updateQuestComment } from '../api/update-quest-comment'
+import { setCommentError } from '../comment-drafts'
 
 interface UpdateQuestCommentVariables {
   commentId: string
@@ -24,13 +28,18 @@ export function useUpdateQuestComment(questId: string) {
       updateQuestComment({ data: { questId, commentId, body } }),
 
     onMutate: async ({ commentId, body }) => {
+      setCommentError(questId, null)
       await queryClient.cancelQueries({ queryKey })
 
-      const previous = queryClient.getQueryData<QuestCommentsCache>(queryKey)
+      // Solo la versión previa de ESTE comentario, para un rollback dirigido.
+      const previous = findQuestComment(
+        queryClient.getQueryData<QuestCommentsCache>(queryKey),
+        commentId,
+      )?.item
 
       // Mismo criterio que el servidor: un cuerpo idéntico no es una edición y
       // no muestra "edited". La marca optimista usa la hora local solo para
-      // pintarse; la del servidor (`now()`) la sustituye al volver.
+      // pintarse; la del servidor la sustituye al volver.
       queryClient.setQueryData<QuestCommentsCache>(queryKey, (cache) =>
         updateQuestCommentPages(cache, (items) =>
           items.map((item) =>
@@ -50,10 +59,15 @@ export function useUpdateQuestComment(questId: string) {
       )
     },
 
-    onError: (_error, _variables, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(queryKey, context.previous)
+    // Rollback dirigido: solo este comentario vuelve a su versión previa.
+    onError: (error, { commentId }, context) => {
+      const previous = context?.previous
+      if (previous) {
+        queryClient.setQueryData<QuestCommentsCache>(queryKey, (cache) =>
+          replaceQuestComment(cache, commentId, previous),
+        )
       }
+      setCommentError(questId, error.message)
     },
 
     onSettled: () => {

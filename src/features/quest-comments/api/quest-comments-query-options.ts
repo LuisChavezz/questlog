@@ -83,6 +83,25 @@ export function replaceQuestComment(
   )
 }
 
+/**
+ * Localiza un comentario en la caché: el ítem y su posición (página e índice),
+ * para que un rollback lo devuelva exactamente a su sitio.
+ */
+export function findQuestComment(
+  cache: QuestCommentsCache | undefined,
+  id: string,
+) {
+  if (!cache) return null
+
+  for (const [pageIndex, page] of cache.pages.entries()) {
+    const index = page.items.findIndex((item) => item.id === id)
+    const item = page.items.at(index)
+    if (index !== -1 && item) return { item, pageIndex, index }
+  }
+
+  return null
+}
+
 /** Hilo de más antiguo a más reciente: el orden en que se pinta. */
 export function flattenQuestCommentPages(
   cache: Pick<QuestCommentsCache, 'pages'>,

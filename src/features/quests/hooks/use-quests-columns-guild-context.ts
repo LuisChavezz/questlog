@@ -74,15 +74,14 @@ export function useQuestsColumnsGuildContext(
 
   return useMemo(
     () =>
-      guildMembers && guildAuth && guildCurrentUserId
+      guildMembers && guildAuth
         ? {
             members: guildMembers,
-            currentUserId: guildCurrentUserId,
             onAssignmentChange: updateAssignment,
             canManageQuest: guildAuth.canManageQuest,
             canUpdateQuestStatus: guildAuth.canUpdateQuestStatus,
           }
         : undefined,
-    [guildMembers, guildAuth, guildCurrentUserId, updateAssignment],
+    [guildMembers, guildAuth, updateAssignment],
   )
 }

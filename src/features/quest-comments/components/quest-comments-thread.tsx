@@ -2,8 +2,9 @@
  * QuestCommentsThread — hilo plano de comentarios de una quest de guild, de
  * más antiguo a más reciente (el más nuevo queda junto al composer, que vive en
  * el pie del drawer). Carga los 20 más recientes y "Load older" trae los 20
- * anteriores a cada cursor. Los errores de editar/borrar se pintan aquí, en la
- * propia sección, no en el diálogo de confirmación.
+ * anteriores a cada cursor. Los errores de editar/borrar no se pintan aquí ni
+ * en el diálogo de confirmación: los publica cada hook en el store de la quest y
+ * los muestra el composer, en el pie fijo del drawer.
  */
 import { useEffect, useRef, useState } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
@@ -47,7 +48,8 @@ export function QuestCommentsThread({ questId }: { questId: string }) {
   const deleteComment = useDeleteQuestComment(questId)
 
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
-  const [actionError, setActionError] = useState<string | null>(null)
+  // Destino estable del foco al cerrar el diálogo de borrado (ver abajo).
+  const threadRef = useRef<HTMLDivElement>(null)
 
   const comments = data ? flattenQuestCommentPages(data) : []
   const newest = comments.at(-1)
@@ -78,7 +80,11 @@ export function QuestCommentsThread({ questId }: { questId: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div
+      ref={threadRef}
+      tabIndex={-1}
+      className="flex flex-col gap-4 outline-none"
+    >
       {hasNextPage && (
         <Button
           type="button"
@@ -101,25 +107,12 @@ export function QuestCommentsThread({ questId }: { questId: string }) {
           <QuestCommentEntry
             key={comment.id}
             comment={comment}
-            onSaveEdit={(body) => {
-              setActionError(null)
-              updateComment.mutate(
-                { commentId: comment.id, body },
-                {
-                  onError: (mutationError) =>
-                    setActionError(mutationError.message),
-                },
-              )
-            }}
+            onSaveEdit={(body) =>
+              updateComment.mutate({ commentId: comment.id, body })
+            }
             onRequestDelete={() => setPendingDeleteId(comment.id)}
           />
         ))
-      )}
-
-      {actionError && (
-        <p role="alert" className="text-sm text-destructive">
-          {actionError}
-        </p>
       )}
 
       <div ref={endRef} />
@@ -134,17 +127,19 @@ export function QuestCommentsThread({ questId }: { questId: string }) {
         description="This comment will be permanently deleted. This action cannot be undone."
         confirmLabel="Delete"
         cancelLabel="Cancel"
+        // El borrado optimista retira el comentario —y con él el botón Delete
+        // que abrió el diálogo—, así que devolverle el foco al cerrar lo
+        // mandaría a un nodo desmontado y el foco acabaría en <body>, fuera del
+        // drawer. Se lleva al contenedor del hilo, que sigue montado.
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          threadRef.current?.focus()
+        }}
         onConfirm={() => {
           if (!pendingDeleteId) return
-          setActionError(null)
           // Sin `await`: el borrado es optimista, así que el diálogo se cierra
-          // en el acto y un fallo se pinta en la sección, no en el diálogo.
-          deleteComment.mutate(
-            { commentId: pendingDeleteId },
-            {
-              onError: (mutationError) => setActionError(mutationError.message),
-            },
-          )
+          // en el acto; un fallo lo publica el hook y lo pinta el composer.
+          deleteComment.mutate({ commentId: pendingDeleteId })
         }}
       />
     </div>

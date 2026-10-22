@@ -285,9 +285,6 @@ export function createSupervisorFilterDef(
 export interface QuestsColumnsGuildContext {
   // Miembros del guild para poblar los selectores (una sola lista, dos columnas)
   members: MemberOption[]
-  // Usuario que observa la tabla. Solo lo usa el drawer de detalle para pintar
-  // con su nombre y avatar el comentario optimista que acaba de publicar.
-  currentUserId: string
   onAssignmentChange: (input: {
     id: string
     field: 'assigneeId' | 'supervisorId'
@@ -639,7 +636,6 @@ export const questsColumns = createQuestsColumns(() => {})
 // columna de guild, este skeleton la refleja automáticamente.
 export const guildQuestsColumns = createQuestsColumns(() => {}, {
   members: [],
-  currentUserId: '',
   onAssignmentChange: () => {},
   canManageQuest: () => false,
   canUpdateQuestStatus: () => false,

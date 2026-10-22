@@ -1,17 +1,20 @@
 // @vitest-environment jsdom
 // Fija el comportamiento optimista de useUpdateQuestComment sobre la caché
 // infinita: parchea el cuerpo y la marca "edited" en la página donde esté el
-// comentario, no marca nada si el cuerpo no cambia, revierte ante un error y
-// solo invalida `['quest-comments', questId]`.
+// comentario, no marca nada si el cuerpo no cambia, revierte SOLO ese
+// comentario ante un error y publica el error de la quest —también con dos
+// ediciones solapadas—, y solo invalida `['quest-comments', questId]`.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 
+import { getCommentError, setCommentError } from '../comment-drafts'
 import { useUpdateQuestComment } from './use-update-quest-comment'
 import {
   createTestQueryClient,
   makeCache,
   makeComment,
   QUEST_ID,
+  deferred,
 } from './quest-comment-test-fixtures'
 
 const { updateQuestCommentMock } = vi.hoisted(() => ({
@@ -39,6 +42,7 @@ function setup() {
 
 afterEach(() => {
   updateQuestCommentMock.mockReset()
+  setCommentError(QUEST_ID, null)
 })
 
 describe('useUpdateQuestComment', () => {
@@ -75,7 +79,7 @@ describe('useUpdateQuestComment', () => {
     expect(readOlder().editedAt).toEqual(serverEditedAt)
   })
 
-  it('revierte al snapshot si el servidor rechaza la edición', async () => {
+  it('revierte el comentario y publica el error si el servidor rechaza la edición', async () => {
     updateQuestCommentMock.mockRejectedValue(new Error('Conflict: nope'))
     const { result, readCache, seed } = setup()
 
@@ -83,6 +87,7 @@ describe('useUpdateQuestComment', () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true))
     expect(readCache()).toEqual(seed)
+    expect(getCommentError(QUEST_ID)).toBe('Conflict: nope')
   })
 
   it('al asentarse invalida SOLO el hilo de esta quest', async () => {
@@ -96,5 +101,32 @@ describe('useUpdateQuestComment', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ['quest-comments', QUEST_ID],
     })
+  })
+
+  it('dos ediciones solapadas: la primera falla y la segunda sale bien', async () => {
+    const first = deferred()
+    const second = deferred()
+    updateQuestCommentMock
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+    const { result, readCache } = setup()
+    const bodyOf = (id: string) =>
+      readCache()!
+        .pages.flatMap((page) => page.items)
+        .find((item) => item.id === id)?.body
+
+    result.current.mutate({ commentId: 'older', body: 'Edited older' })
+    result.current.mutate({ commentId: 'newest', body: 'Edited newest' })
+    await waitFor(() => expect(bodyOf('newest')).toBe('Edited newest'))
+
+    first.reject(new Error('Conflict: first failed'))
+    second.resolve(makeComment({ id: 'newest', body: 'Edited newest' }))
+
+    await waitFor(() =>
+      expect(getCommentError(QUEST_ID)).toBe('Conflict: first failed'),
+    )
+    // Solo la edición fallida vuelve atrás; la otra conserva su cuerpo nuevo.
+    expect(bodyOf('older')).toBe('Original')
+    await waitFor(() => expect(bodyOf('newest')).toBe('Edited newest'))
   })
 })
