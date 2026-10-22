@@ -30,6 +30,7 @@ export const getGuildInvitePreview = createServerFn({ method: 'GET' })
         name: guilds.name,
         slug: guilds.slug,
         description: guilds.description,
+        coatOfArmsSvg: guilds.coatOfArmsSvg,
       })
       .from(guilds)
       .where(eq(guilds.inviteCode, data.code))
@@ -82,6 +83,8 @@ export const getGuildInvitePreview = createServerFn({ method: 'GET' })
         name: guild.name,
         slug: guild.slug,
         description: guild.description,
+        // Mismo escudo que muestran las páginas del guild (null → ícono genérico)
+        coatOfArmsSvg: guild.coatOfArmsSvg,
         memberCount,
         // Solo datos públicos: iniciales + imagen. Sin nombres completos,
         // ids, emails ni roles de los demás miembros — el helper ya retira el
