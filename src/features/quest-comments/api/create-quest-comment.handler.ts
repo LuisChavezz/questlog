@@ -37,6 +37,9 @@ export async function createQuestCommentHandler(
   // del observador, y ningún predicado de comentarios lee el rol de otro.
   const { guildId } = await resolveCommentableQuestOrThrow(data.questId)
   await resolveGuildQuestAuth(guildId, userId)
+  // El autor es siempre el observador: sus datos de presentación se leen aquí,
+  // sin bloqueo, y no dentro de la transacción.
+  const author = await selectCommentAuthor(userId)
 
   // Riesgo de deadlock con delete-guild: ese handler bloquea `guilds` y su
   // cascada baja a `guild_members` y `quests`; aquí se toma `quests` y después
@@ -72,8 +75,6 @@ export async function createQuestCommentHandler(
             body: data.body,
           })
           .returning()
-
-        const author = await selectCommentAuthor(tx, userId)
 
         return toQuestCommentItem({ ...created, ...author }, viewer)
       }),
