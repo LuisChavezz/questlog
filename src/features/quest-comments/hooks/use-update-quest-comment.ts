@@ -13,6 +13,7 @@ import {
 import type { QuestCommentsCache } from '../api/quest-comments-query-options'
 import { updateQuestComment } from '../api/update-quest-comment'
 import { setCommentError } from '../comment-drafts'
+import { getQuestCommentErrorMessage } from '../comment-error-message'
 
 interface UpdateQuestCommentVariables {
   commentId: string
@@ -67,7 +68,7 @@ export function useUpdateQuestComment(questId: string) {
           replaceQuestComment(cache, commentId, previous),
         )
       }
-      setCommentError(questId, error.message)
+      setCommentError(questId, getQuestCommentErrorMessage(error, 'edit'))
     },
 
     onSettled: () => {

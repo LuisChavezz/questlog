@@ -102,4 +102,15 @@ describe('useDeleteQuestComment', () => {
     // Vuelve solo el borrado fallido; el exitoso NO resucita.
     expect(ids()).toEqual([['target'], ['oldest']])
   })
+
+  it('un fallo de red publica un mensaje propio, no "Failed to fetch"', async () => {
+    deleteQuestCommentMock.mockRejectedValue(new TypeError('Failed to fetch'))
+    const { result } = setup()
+    result.current.mutate({ commentId: 'target' })
+    await waitFor(() =>
+      expect(getCommentError(QUEST_ID)).toBe(
+        "Couldn't delete the comment. Check your connection and try again.",
+      ),
+    )
+  })
 })

@@ -18,6 +18,7 @@ import type {
   QuestCommentsCache,
 } from '../api/quest-comments-query-options'
 import { keepFailedComment, setCommentError } from '../comment-drafts'
+import { getQuestCommentErrorMessage } from '../comment-error-message'
 
 // Id temporal del comentario optimista: nunca coincide con un uuid del servidor.
 let optimisticCounter = 0
@@ -90,7 +91,7 @@ export function useCreateQuestComment(
         )
       }
       keepFailedComment(questId, body)
-      setCommentError(questId, error.message)
+      setCommentError(questId, getQuestCommentErrorMessage(error, 'post'))
     },
 
     // Solo el hilo de ESTA quest: ningún otro dato depende de sus comentarios

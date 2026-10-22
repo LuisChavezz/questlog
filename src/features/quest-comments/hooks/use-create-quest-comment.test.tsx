@@ -176,4 +176,15 @@ describe('useCreateQuestComment', () => {
       ]),
     )
   })
+
+  it('un fallo de red publica un mensaje propio, no "Failed to fetch"', async () => {
+    createQuestCommentMock.mockRejectedValue(new TypeError('Failed to fetch'))
+    const { result } = setup()
+    result.current.mutate('Hello guild')
+    await waitFor(() =>
+      expect(getCommentError(QUEST_ID)).toBe(
+        "Couldn't post your comment. Check your connection and try again.",
+      ),
+    )
+  })
 })
