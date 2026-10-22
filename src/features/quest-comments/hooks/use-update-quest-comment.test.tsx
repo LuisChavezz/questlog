@@ -129,4 +129,15 @@ describe('useUpdateQuestComment', () => {
     expect(bodyOf('older')).toBe('Original')
     await waitFor(() => expect(bodyOf('newest')).toBe('Edited newest'))
   })
+
+  it('un fallo de red publica un mensaje propio, no "Failed to fetch"', async () => {
+    updateQuestCommentMock.mockRejectedValue(new TypeError('Failed to fetch'))
+    const { result } = setup()
+    result.current.mutate({ commentId: 'older', body: 'Edited' })
+    await waitFor(() =>
+      expect(getCommentError(QUEST_ID)).toBe(
+        "Couldn't save your edit. Check your connection and try again.",
+      ),
+    )
+  })
 })

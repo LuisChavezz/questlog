@@ -12,6 +12,7 @@ import {
 } from '../api/quest-comments-query-options'
 import type { QuestCommentsCache } from '../api/quest-comments-query-options'
 import { setCommentError } from '../comment-drafts'
+import { getQuestCommentErrorMessage } from '../comment-error-message'
 
 export function useDeleteQuestComment(questId: string) {
   const queryClient = useQueryClient()
@@ -56,7 +57,7 @@ export function useDeleteQuestComment(questId: string) {
           }),
         )
       }
-      setCommentError(questId, error.message)
+      setCommentError(questId, getQuestCommentErrorMessage(error, 'delete'))
     },
 
     onSettled: () => {

@@ -17,6 +17,7 @@ import {
 } from '../api/quest-comments-query-options'
 import { useDeleteQuestComment } from '../hooks/use-delete-quest-comment'
 import { useUpdateQuestComment } from '../hooks/use-update-quest-comment'
+import { getQuestCommentErrorMessage } from '../comment-error-message'
 import { QuestCommentEntry } from './quest-comment-entry'
 
 function ThreadSkeleton() {
@@ -74,7 +75,7 @@ export function QuestCommentsThread({ questId }: { questId: string }) {
   if (!data) {
     return (
       <p role="alert" className="text-sm text-destructive">
-        {error.message}
+        {getQuestCommentErrorMessage(error, 'load')}
       </p>
     )
   }

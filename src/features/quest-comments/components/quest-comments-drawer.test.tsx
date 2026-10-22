@@ -611,4 +611,18 @@ describe('Comentarios en el drawer de detalle', () => {
       within(getCommentForm(drawer)).getByText('2 unsent comments'),
     ).toBeTruthy()
   })
+
+  it('si falla la carga del hilo, muestra un mensaje propio y no "Failed to fetch"', async () => {
+    getQuestCommentsMock.mockRejectedValue(new TypeError('Failed to fetch'))
+    const queryClient = renderQuests()
+    // Sin hilo en caché: el drawer tiene que pedirlo y la petición falla.
+    queryClient.removeQueries({ queryKey: ['quest-comments', 'q-caves'] })
+    const drawer = openQuest('Map the caves')
+
+    const region = within(drawer).getByRole('region', { name: 'Comments' })
+    expect((await within(region).findByRole('alert')).textContent).toBe(
+      "Couldn't load comments. Check your connection and try again.",
+    )
+    expect(within(drawer).queryByText(/Failed to fetch/)).toBeNull()
+  })
 })
