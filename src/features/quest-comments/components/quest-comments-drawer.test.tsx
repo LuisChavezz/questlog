@@ -34,6 +34,7 @@ import type {
 import {
   discardUnsentComment,
   getUnsentComments,
+  keepFailedComment,
   setCommentDraft,
   setCommentError,
 } from '../comment-drafts'
@@ -577,27 +578,18 @@ describe('Comentarios en el drawer de detalle', () => {
     expect(getComposer(drawer)).toHaveProperty('value', 'Third draft')
   })
 
-  it('varios fallos se acumulan con su recuento y cada quest guarda los suyos', async () => {
-    getQuestCommentsMock.mockResolvedValue(singlePage([]).pages[0])
-    createQuestCommentMock.mockRejectedValue(new Error('Conflict: post failed'))
+  it('el aviso muestra el recuento de no enviados y cada quest los suyos', () => {
+    // La acumulación en sí la cubre comment-drafts.test.ts: aquí solo se siembra
+    // el store como lo dejarían dos fallos y se mira lo que pinta el drawer.
+    setCommentDraft('q-caves', 'Typing')
+    keepFailedComment('q-caves', 'Failure one')
+    keepFailedComment('q-caves', 'Failure two')
     renderQuests()
-    let drawer = openQuest('Map the caves')
-    const post = (text: string) => {
-      fireEvent.change(getComposer(drawer), { target: { value: text } })
-      fireEvent.click(within(drawer).getByRole('button', { name: 'Comment' }))
-    }
 
-    // Cada fallo llega con el composer ya ocupado por el siguiente texto.
-    post('Failure one')
-    fireEvent.change(getComposer(drawer), { target: { value: 'Typing' } })
-    await waitFor(() =>
-      expect(
-        within(getCommentForm(drawer)).getByText('Unsent comment'),
-      ).toBeTruthy(),
-    )
-    post('Failure two')
-    fireEvent.change(getComposer(drawer), { target: { value: 'Typing' } })
-    await within(getCommentForm(drawer)).findByText('2 unsent comments')
+    let drawer = openQuest('Map the caves')
+    expect(
+      within(getCommentForm(drawer)).getByText('2 unsent comments'),
+    ).toBeTruthy()
 
     // Otra quest no ve los no enviados de esta.
     drawer = openQuest('Slay the dragon')
@@ -605,8 +597,12 @@ describe('Comentarios en el drawer de detalle', () => {
       within(getCommentForm(drawer)).queryByRole('button', { name: 'Restore' }),
     ).toBeNull()
 
-    // Y al volver siguen ahí.
+    // Y al volver siguen ahí; Restore trae el más reciente.
     drawer = openQuest('Map the caves')
+    fireEvent.click(
+      within(getCommentForm(drawer)).getByRole('button', { name: 'Restore' }),
+    )
+    expect(getComposer(drawer)).toHaveProperty('value', 'Failure two')
     expect(
       within(getCommentForm(drawer)).getByText('2 unsent comments'),
     ).toBeTruthy()
