@@ -7,6 +7,7 @@ import { UserAvatar } from '#/components/user-avatar'
 import { Button } from '#/components/ui/button'
 import { useJoinGuild } from '../hooks/use-join-guild'
 import type { GuildInvitePreview } from '../api/get-guild-invite-preview'
+import { GuildCoatOfArms } from './guild-coat-of-arms'
 import { GuildEmblem } from './guild-emblem'
 
 // Datos resueltos por el loader de /invite/$code.
@@ -127,9 +128,22 @@ function InvitePreviewCard({
 
   return (
     <InviteCard>
-      <div className="mx-auto mb-6 flex w-fit rounded-2xl bg-primary/5 p-6">
-        <GuildEmblem className="h-20 w-20 text-primary" />
-      </div>
+      {preview.coatOfArmsSvg ? (
+        // Escudo real: sin caja de fondo — mismo criterio que
+        // guild-detail-header.tsx (la ilustración ya trae su propio borde)
+        <GuildCoatOfArms
+          svg={preview.coatOfArmsSvg}
+          className="mx-auto mb-6 h-32 w-32 object-contain"
+          emblemClassName="mx-auto mb-6 block h-20 w-20 text-primary"
+        />
+      ) : (
+        <div className="mx-auto mb-6 flex w-fit rounded-2xl bg-primary/5 p-6">
+          <GuildCoatOfArms
+            svg={null}
+            emblemClassName="h-20 w-20 text-primary"
+          />
+        </div>
+      )}
 
       <p className="text-sm font-medium text-muted-foreground">
         You&apos;ve been invited to join
