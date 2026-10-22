@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-// Comentarios dentro del drawer de detalle, montados desde la lista real de
-// `/quests` (tabla personal + tabla por guild) y abiertos con el trigger de la
-// fila. Fija que la sección solo existe en quests de guild, que las acciones
+// Comentarios dentro del drawer de detalle (el mismo QuestDetailsDrawer que
+// montan las tablas), abierto con triggers marcados como los de la fila. Fija que la sección solo existe en quests de guild, que las acciones
 // siguen los permisos que manda el servidor, que el borrador sobrevive a
-// cambiar de quest, que Escape en el composer no cierra el drawer y que un
-// error de borrado se pinta en la sección.
+// cambiar de quest, que Escape en el composer no cierra el drawer, que cada
+// error de una mutación se pinta en el drawer —también con mutaciones
+// solapadas— y que el flujo de borrado no deja el foco fuera del drawer.
+import { useState } from 'react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
@@ -23,19 +24,43 @@ import {
   QUESTS_QUERY_KEY,
 } from '#/features/quests/api/quests-query-options'
 import type { QuestGuild } from '#/features/quests/api/get-quest-guilds'
-import { QuestsTable } from '#/features/quests/components/quests-table'
+import { QuestDetailsDrawer } from '#/features/quests/components/quest-details-drawer'
+import { QUEST_OPEN_TRIGGER_ATTR } from '#/features/quests/components/quests-columns'
+import type { QuestsColumnsGuildContext } from '#/features/quests/components/quests-columns'
 import type {
   QuestCommentCacheItem,
   QuestCommentsCache,
 } from '../api/quest-comments-query-options'
-import { setCommentDraft } from '../comment-drafts'
+import { setCommentDraft, setCommentError } from '../comment-drafts'
+import { deferred } from '../hooks/quest-comment-test-fixtures'
 
-const { deleteQuestCommentMock, getQuestCommentsMock } = vi.hoisted(() => ({
-  deleteQuestCommentMock: vi.fn(),
-  getQuestCommentsMock: vi.fn(),
+const { createQuestCommentMock, deleteQuestCommentMock, getQuestCommentsMock } =
+  vi.hoisted(() => ({
+    createQuestCommentMock: vi.fn(),
+    deleteQuestCommentMock: vi.fn(),
+    getQuestCommentsMock: vi.fn(),
+  }))
+vi.mock('../api/create-quest-comment', () => ({
+  createQuestComment: createQuestCommentMock,
 }))
 vi.mock('../api/delete-quest-comment', () => ({
   deleteQuestComment: deleteQuestCommentMock,
+}))
+// El autor del comentario optimista sale de la sesión de Better Auth.
+vi.mock('#/lib/auth-client', () => ({
+  authClient: {
+    useSession: () => ({
+      data: {
+        user: {
+          id: 'user-1',
+          name: 'Ada Lovelace',
+          email: 'ada@example.com',
+          image: null,
+          avatarId: null,
+        },
+      },
+    }),
+  },
 }))
 // Cada mutación invalida el hilo al asentarse: el refetch no debe llegar al
 // server fn real, que fuera del runtime de Start no tiene contexto.
@@ -152,6 +177,47 @@ const DRAGON_THREAD = singlePage([
   }),
 ])
 
+// Contexto de guild que la tabla pasaría al drawer en una quest de guild.
+const GUILD_CONTEXT: QuestsColumnsGuildContext = {
+  members: QUEST_GUILDS[0].members,
+  onAssignmentChange: () => {},
+  canManageQuest: () => true,
+  canUpdateQuestStatus: () => true,
+}
+
+// Host mínimo del drawer: el MISMO QuestDetailsDrawer que montan las tablas,
+// con un trigger "Open details" por quest marcado con QUEST_OPEN_TRIGGER_ATTR
+// (como los de la fila). No monta `QuestsTable` entera: con DataTable y Radix
+// por test, la suite completa en paralelo hacía agotar el timeout a otros tests
+// pesados de jsdom.
+function DrawerHost() {
+  const [openId, setOpenId] = useState<string | null>(null)
+  const quest = QUESTS.find((candidate) => candidate.id === openId) ?? null
+
+  return (
+    <>
+      {QUESTS.map((candidate) => (
+        <button
+          key={candidate.id}
+          type="button"
+          {...{ [QUEST_OPEN_TRIGGER_ATTR]: 'true' }}
+          onClick={() => setOpenId(candidate.id)}
+        >
+          {`Open details: ${candidate.title}`}
+        </button>
+      ))}
+      <QuestDetailsDrawer
+        quest={quest}
+        onOpenChange={(open) => {
+          if (!open) setOpenId(null)
+        }}
+        onUpdate={() => {}}
+        guildContext={quest?.guildId ? GUILD_CONTEXT : undefined}
+      />
+    </>
+  )
+}
+
 function renderQuests() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -167,7 +233,7 @@ function renderQuests() {
   render(
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <QuestsTable currentUserId={CURRENT_USER_ID} />
+        <DrawerHost />
       </TooltipProvider>
     </QueryClientProvider>,
   )
@@ -184,6 +250,23 @@ function openQuest(title: string) {
 
 function getComposer(drawer: HTMLElement) {
   return within(drawer).getByRole('textbox', { name: 'Write a comment' })
+}
+
+function getCommentForm(drawer: HTMLElement) {
+  return within(drawer).getByRole('form', { name: 'Add a comment' })
+}
+
+// Pide borrar el comentario de `authorName` y confirma en el diálogo.
+async function confirmDelete(drawer: HTMLElement, authorName: string) {
+  fireEvent.click(
+    within(getComment(drawer, authorName)).getByRole('button', {
+      name: 'Delete comment',
+    }),
+  )
+  const confirm = await screen.findByRole('alertdialog')
+  fireEvent.click(within(confirm).getByRole('button', { name: 'Delete' }))
+  // Mientras el diálogo está abierto, Radix oculta el resto a la accesibilidad.
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
 }
 
 function getComment(drawer: HTMLElement, authorName: string) {
@@ -205,17 +288,16 @@ beforeAll(() => {
 
 afterEach(() => {
   cleanup()
+  createQuestCommentMock.mockReset()
   deleteQuestCommentMock.mockReset()
   getQuestCommentsMock.mockReset()
-  setCommentDraft('q-dragon', '')
-  setCommentDraft('q-caves', '')
+  for (const questId of ['q-dragon', 'q-caves']) {
+    setCommentDraft(questId, '')
+    setCommentError(questId, null)
+  }
 })
 
-// Cada test monta la página `/quests` completa (tabla personal + tabla de guild,
-// con DataTable y Radix) y abre el drawer: en solitario tarda ~1 s, pero con la
-// suite entera en paralelo supera los 5 s por defecto. El margen es de tiempo
-// de pared, no de lógica asíncrona pendiente.
-describe('Comentarios en el drawer de detalle', { timeout: 20_000 }, () => {
+describe('Comentarios en el drawer de detalle', () => {
   it('una quest personal no tiene sección de comentarios ni composer', () => {
     renderQuests()
 
@@ -326,7 +408,7 @@ describe('Comentarios en el drawer de detalle', { timeout: 20_000 }, () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
-  it('un error al borrar se pinta en la sección y el comentario vuelve', async () => {
+  it('un error al borrar se pinta en el drawer y el comentario vuelve', async () => {
     // El refetch posterior al rollback devuelve el hilo intacto.
     getQuestCommentsMock.mockResolvedValue(DRAGON_THREAD.pages[0])
     deleteQuestCommentMock.mockRejectedValue(
@@ -337,23 +419,137 @@ describe('Comentarios en el drawer de detalle', { timeout: 20_000 }, () => {
     renderQuests()
     const drawer = openQuest('Slay the dragon')
 
-    fireEvent.click(
-      within(getComment(drawer, 'Grace Hopper')).getByRole('button', {
-        name: 'Delete comment',
-      }),
-    )
-    const confirm = await screen.findByRole('alertdialog')
-    fireEvent.click(within(confirm).getByRole('button', { name: 'Delete' }))
-
     // El diálogo se cierra en el acto (borrado optimista): el error NO se pinta
-    // ahí. Mientras está abierto, Radix oculta el resto a la accesibilidad.
-    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    // ahí sino en el pie del drawer, junto al composer.
+    await confirmDelete(drawer, 'Grace Hopper')
 
-    const thread = within(drawer).getByRole('region', { name: 'Comments' })
-    expect((await within(thread).findByRole('alert')).textContent).toContain(
-      'Conflict: the comment changed while deleting',
-    )
-    // Rollback del borrado optimista.
+    expect(
+      (await within(getCommentForm(drawer)).findByRole('alert')).textContent,
+    ).toContain('Conflict: the comment changed while deleting')
     expect(getComment(drawer, 'Grace Hopper')).toBeTruthy()
+  })
+
+  it('tras confirmar un borrado el foco queda dentro del drawer, que sigue abierto', async () => {
+    deleteQuestCommentMock.mockReturnValue(new Promise(() => {}))
+    renderQuests()
+    const drawer = openQuest('Slay the dragon')
+
+    await confirmDelete(drawer, 'Grace Hopper')
+
+    // El botón Delete que abrió el diálogo ya no existe (borrado optimista): el
+    // foco va al contenedor del hilo en vez de perderse en <body>.
+    const thread = within(drawer)
+      .getByRole('region', { name: 'Comments' })
+      .querySelector('[tabindex="-1"]')
+    await waitFor(() => expect(document.activeElement).toBe(thread))
+    expect(screen.queryByRole('dialog')).not.toBeNull()
+  })
+
+  it('dos borrados solapados: el fallo del primero se ve y el segundo se mantiene', async () => {
+    const first = deferred()
+    const second = deferred()
+    deleteQuestCommentMock
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+    // Estado real del servidor tras ambos: solo cayó el comentario propio.
+    getQuestCommentsMock.mockResolvedValue({
+      ...DRAGON_THREAD.pages[0],
+      items: DRAGON_THREAD.pages[0].items.filter(
+        (item) => item.id !== 'c-mine',
+      ),
+    })
+    renderQuests()
+    const drawer = openQuest('Slay the dragon')
+
+    await confirmDelete(drawer, 'Grace Hopper')
+    await confirmDelete(drawer, 'Ada Lovelace')
+
+    first.reject(new Error('Conflict: first delete failed'))
+    second.resolve({ id: 'c-mine', questId: 'q-dragon' })
+
+    expect(
+      (await within(getCommentForm(drawer)).findByRole('alert')).textContent,
+    ).toBe('Conflict: first delete failed')
+    await waitFor(() => expect(getComment(drawer, 'Grace Hopper')).toBeTruthy())
+    expect(
+      within(drawer).queryByRole('article', {
+        name: 'Comment by Ada Lovelace',
+      }),
+    ).toBeNull()
+  })
+
+  it('el comentario optimista se pinta con el autor de la sesión', async () => {
+    createQuestCommentMock.mockReturnValue(new Promise(() => {}))
+    renderQuests()
+    const drawer = openQuest('Map the caves')
+
+    fireEvent.change(getComposer(drawer), {
+      target: { value: 'Torches ready' },
+    })
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Comment' }))
+
+    const posted = await within(drawer).findByRole('article', {
+      name: 'Comment by Ada Lovelace',
+    })
+    expect(within(posted).getByText('Posting…')).toBeTruthy()
+    expect(getComposer(drawer)).toHaveProperty('value', '')
+  })
+
+  it('una publicación fallida vuelve al textarea visible y muestra su error', async () => {
+    getQuestCommentsMock.mockResolvedValue(singlePage([]).pages[0])
+    createQuestCommentMock.mockRejectedValue(
+      new Error('Forbidden: you are not a member of this guild'),
+    )
+    renderQuests()
+    const drawer = openQuest('Map the caves')
+
+    fireEvent.change(getComposer(drawer), {
+      target: { value: 'Torches ready' },
+    })
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Comment' }))
+
+    expect(
+      (await within(getCommentForm(drawer)).findByRole('alert')).textContent,
+    ).toBe('Forbidden: you are not a member of this guild')
+    expect(getComposer(drawer)).toHaveProperty('value', 'Torches ready')
+  })
+
+  it('dos publicaciones solapadas: el fallo de la primera se ve y no pisa lo que se escribe', async () => {
+    const first = deferred()
+    const second = deferred()
+    createQuestCommentMock
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+    getQuestCommentsMock.mockResolvedValue(singlePage([]).pages[0])
+    renderQuests()
+    const drawer = openQuest('Map the caves')
+    const post = (text: string) => {
+      fireEvent.change(getComposer(drawer), { target: { value: text } })
+      fireEvent.click(within(drawer).getByRole('button', { name: 'Comment' }))
+    }
+
+    post('First')
+    post('Second')
+    // El usuario ya escribe un tercero mientras ambos están en vuelo.
+    fireEvent.change(getComposer(drawer), {
+      target: { value: 'Third draft' },
+    })
+
+    first.reject(new Error('Conflict: first post failed'))
+    second.resolve({
+      id: 'c-second',
+      body: 'Second',
+      createdAt: new Date('2026-07-21T10:00:00.000Z'),
+      editedAt: null,
+      author: null,
+      canEdit: true,
+      canDelete: true,
+    })
+
+    expect(
+      (await within(getCommentForm(drawer)).findByRole('alert')).textContent,
+    ).toBe('Conflict: first post failed')
+    // Lo que se está escribiendo no se pisa con el texto de la fallida.
+    expect(getComposer(drawer)).toHaveProperty('value', 'Third draft')
   })
 })

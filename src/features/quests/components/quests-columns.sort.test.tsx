@@ -34,7 +34,6 @@ const MEMBERS: MemberOption[] = [
 // predicados no afectan al ordenamiento, solo a la edición inline).
 const columns = createQuestsColumns(() => {}, {
   members: MEMBERS,
-  currentUserId: 'user-1',
   onAssignmentChange: () => {},
   canManageQuest: () => true,
   canUpdateQuestStatus: () => true,
@@ -158,7 +157,6 @@ describe('Guild quests columns — ordenamiento de Assignee', () => {
     ]
     const invertedColumns = createQuestsColumns(() => {}, {
       members: invertedMembers,
-      currentUserId: 'user-1',
       onAssignmentChange: () => {},
       canManageQuest: () => true,
       canUpdateQuestStatus: () => true,

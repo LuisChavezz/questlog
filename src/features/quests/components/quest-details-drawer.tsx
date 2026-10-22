@@ -28,12 +28,10 @@ import {
   SheetTitle,
 } from '#/components/ui/sheet'
 import type { Quest } from '#/db/schema'
-import type { QuestCommentAuthor } from '#/features/quest-comments/api/quest-comment-item'
 import { QuestCommentComposer } from '#/features/quest-comments/components/quest-comment-composer'
 import { isQuestCommentInputEvent } from '#/features/quest-comments/components/quest-comment-input'
 import { QuestCommentsThread } from '#/features/quest-comments/components/quest-comments-thread'
 import { dateFormatter } from '#/lib/format-date'
-import { getUserInitials } from '#/lib/get-user-initials'
 import type { UpdateQuestValues } from '../schemas/quest-schemas'
 import {
   getQuestPermissions,
@@ -104,6 +102,25 @@ export function QuestDetailsDrawer({
           const target = event.target
           if (
             target instanceof Element &&
+            target.closest(`[${QUEST_OPEN_TRIGGER_ATTR}]`)
+          ) {
+            event.preventDefault()
+          }
+        }}
+        // Mismo criterio para el foco: mover el foco a un trigger "Open" no es
+        // salir del drawer. Tampoco lo es que el foco caiga en <body> (o en un
+        // nodo ya desmontado) porque el elemento enfocado desapareció — p. ej.
+        // el botón Delete de un comentario retirado de forma optimista, al que
+        // un diálogo intentaría devolver el foco. Un clic real fuera sigue
+        // cerrando por `onPointerDownOutside`, y tabular a otro elemento de la
+        // página, por aquí.
+        onFocusOutside={(event) => {
+          const target = event.target
+          if (
+            !(target instanceof Element) ||
+            !target.isConnected ||
+            target === document.body ||
+            target === document.documentElement ||
             target.closest(`[${QUEST_OPEN_TRIGGER_ATTR}]`)
           ) {
             event.preventDefault()
@@ -285,16 +302,11 @@ function QuestDetailsContent({
           {hasComments && (
             <section
               aria-label="Comments"
-              className="flex flex-col gap-3 border-t border-border pt-6"
+              className="border-t border-border pt-6"
             >
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <MessageSquare
-                  className="size-3.5 shrink-0 opacity-60"
-                  aria-hidden="true"
-                />
-                Comments
-              </span>
-              <QuestCommentsThread questId={quest.id} />
+              <DetailField icon={MessageSquare} label="Comments">
+                <QuestCommentsThread questId={quest.id} />
+              </DetailField>
             </section>
           )}
         </div>
@@ -302,31 +314,9 @@ function QuestDetailsContent({
 
       {hasComments && (
         <div className="border-t border-border p-4">
-          <QuestCommentComposer
-            questId={quest.id}
-            currentAuthor={getCurrentAuthor(guildContext)}
-          />
+          <QuestCommentComposer questId={quest.id} />
         </div>
       )}
     </div>
   )
-}
-
-// Autor con el que se pinta el comentario optimista: el usuario actual, resuelto
-// contra el roster del guild. `null` si no aparece (el servidor lo corrige).
-function getCurrentAuthor(
-  guildContext: QuestsColumnsGuildContext | undefined,
-): QuestCommentAuthor | null {
-  const member = guildContext?.members.find(
-    (m) => m.userId === guildContext.currentUserId,
-  )
-  if (!member) return null
-
-  return {
-    id: member.userId,
-    name: member.name,
-    image: member.image ?? null,
-    avatarId: member.avatarId ?? null,
-    initials: member.initials ?? getUserInitials(member.name),
-  }
 }
