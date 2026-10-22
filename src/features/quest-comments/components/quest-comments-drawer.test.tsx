@@ -306,7 +306,13 @@ afterEach(() => {
   }
 })
 
-describe('Comentarios en el drawer de detalle', () => {
+// Timeout de 15 s por describe: estos tests montan el drawer de detalle
+// (Radix Dialog + hilo con TanStack Query) bajo jsdom y, con la suite entera en
+// paralelo, superan los 5 s por defecto aunque en solitario tarden menos de 1 s.
+// Es tiempo de pared, no lógica colgada. Aligerarlos queda pendiente.
+const SLOW = { timeout: 15_000 }
+
+describe('Comentarios en el drawer de detalle', SLOW, () => {
   it('una quest personal no tiene sección de comentarios ni composer', () => {
     renderQuests()
 
