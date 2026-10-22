@@ -119,7 +119,14 @@ afterEach(() => {
   cleanup()
 })
 
-describe('Guild quests table — celdas de asignado/supervisor', () => {
+// Timeout de 15 s por describe: estos tests montan la tabla real de quests
+// de un guild (DataTable + Radix) bajo jsdom y, con la suite entera en
+// paralelo, superan los 5 s por defecto aunque en solitario tarden 1-4 s. Es
+// tiempo de pared, no lógica colgada. Aligerarlos (montar menos árbol por
+// test) queda pendiente.
+const SLOW = { timeout: 15_000 }
+
+describe('Guild quests table — celdas de asignado/supervisor', SLOW, () => {
   it('posiciona el dropdown al hacer click en el avatar (no solo lo mete en el DOM)', async () => {
     renderTable([makeQuest()])
 
@@ -207,7 +214,7 @@ describe('Guild quests table — celdas de asignado/supervisor', () => {
 // La tabla de un guild muestra quests de otros miembros (getGuildQuests no filtra
 // por owner), así que los editores inline y la selección de fila deben respetar
 // los mismos permisos que el servidor. Estos tests fijan ese contrato.
-describe('Guild quests table — autorización de dos ejes', () => {
+describe('Guild quests table — autorización de dos ejes', SLOW, () => {
   it('un Member no puede editar título/estado ni seleccionar la quest de otro miembro', () => {
     // viewer por defecto: user-1 (Member); la quest es de user-2 (Member).
     renderTable([makeQuest({ ownerId: 'user-2' })])
