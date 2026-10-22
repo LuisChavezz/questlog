@@ -10,7 +10,7 @@ import type { SQL } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
 
 import type { GuildRole } from '#/db/schema'
-import { guildQuestComments, quests } from '#/db/schema'
+import { guildQuestComments, quests, user } from '#/db/schema'
 import {
   enqueueError,
   enqueueSelect,
@@ -85,8 +85,8 @@ function authorRow() {
 
 let callsBeforeMembershipLock = -1
 
-// Comprobación previa: quest de guild + comentario. Devuelve la función que
-// encola la parte transaccional de un intento.
+// Comprobación previa: quest de guild, comentario y autor (el observador). La
+// fila del autor sobra en los casos que fallan antes: la cola no se consume.
 function setupPreCheck(opts: {
   viewerId: string
   viewerRole?: GuildRole
@@ -96,17 +96,17 @@ function setupPreCheck(opts: {
   enqueueSelect([{ guildId: GUILD }])
   vi.mocked(resolveGuildQuestAuth).mockResolvedValue(ctx)
   enqueueSelect(opts.comment === null ? [] : [commentRow(opts.comment)])
+  enqueueSelect([authorRow()])
   vi.mocked(resolveLockedGuildQuestAuth).mockImplementation(async () => {
     callsBeforeMembershipLock = getDbCalls().length
     return ctx
   })
 }
 
-// Un intento de la transacción: quest bloqueada, comentario bloqueado, autor.
+// Un intento de la transacción: quest bloqueada y comentario bloqueado.
 function enqueueAttempt(lockedComment: Record<string, unknown> | null = {}) {
   enqueueSelect([{ guildId: GUILD }])
   enqueueSelect(lockedComment === null ? [] : [commentRow(lockedComment)])
-  if (lockedComment !== null) enqueueSelect([authorRow()])
 }
 
 function writes() {
@@ -257,13 +257,19 @@ describe('updateQuestCommentHandler — reverificación bloqueada', () => {
     await updateQuestCommentHandler(payload(), MEMBER)
 
     const calls = getDbCalls()
-    // [0] quest y [1] comentario: comprobación previa, sin bloqueo.
+    // [0] quest, [1] comentario y [2] autor: comprobación previa, sin bloqueo.
     expect(calls[0]).toMatchObject({ table: quests, locked: false })
     expect(calls[1]).toMatchObject({ table: guildQuestComments, locked: false })
-    // [2] quest bloqueada → membresías → [3] comentario bloqueado.
-    expect(calls[2]).toMatchObject({ table: quests, locked: true })
-    expect(callsBeforeMembershipLock).toBe(3)
-    expect(calls[3]).toMatchObject({ table: guildQuestComments, locked: true })
+    expect(calls[2]).toMatchObject({ table: user, locked: false })
+    // [3] quest bloqueada → membresías → [4] comentario bloqueado.
+    expect(calls[3]).toMatchObject({ table: quests, locked: true })
+    expect(callsBeforeMembershipLock).toBe(4)
+    expect(calls[4]).toMatchObject({ table: guildQuestComments, locked: true })
+    // Ningún SELECT a `user` después del primer bloqueo.
+    const firstLock = calls.findIndex((call) => call.locked)
+    expect(calls.slice(firstLock).some((call) => call.table === user)).toBe(
+      false,
+    )
     expect(resolveLockedGuildQuestAuth).toHaveBeenCalledWith(
       expect.anything(),
       GUILD,

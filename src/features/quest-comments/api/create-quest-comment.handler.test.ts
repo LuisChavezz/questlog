@@ -6,7 +6,7 @@
 // forma de la fila devuelta.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { guildQuestComments, quests } from '#/db/schema'
+import { guildQuestComments, quests, user } from '#/db/schema'
 import {
   enqueueError,
   enqueueInsert,
@@ -76,13 +76,13 @@ let callsBeforeMembershipLock = -1
 function setupAllowed() {
   enqueueSelect([{ guildId: GUILD }]) // comprobación previa
   vi.mocked(resolveGuildQuestAuth).mockResolvedValue(authContext())
+  enqueueSelect([authorRow()]) // autor, en la comprobación previa
   enqueueSelect([{ guildId: GUILD }]) // quest bloqueada
   vi.mocked(resolveLockedGuildQuestAuth).mockImplementation(async () => {
     callsBeforeMembershipLock = getDbCalls().length
     return authContext()
   })
   enqueueInsert([insertedRow()])
-  enqueueSelect([authorRow()]) // autor para la fila devuelta
 }
 
 function deadlockError() {
@@ -165,24 +165,41 @@ describe('createQuestCommentHandler — escritura', () => {
     await createQuestCommentHandler(payload(), MEMBER)
 
     const calls = getDbCalls()
-    // [0] comprobación previa sin bloqueo, [1] quest bloqueada.
+    // [0] quest y [1] autor: comprobación previa, sin bloqueo. [2] quest
+    // bloqueada.
     expect(calls[0]).toMatchObject({
       op: 'select',
       table: quests,
       locked: false,
     })
-    expect(calls[1]).toMatchObject({
+    expect(calls[1]).toMatchObject({ op: 'select', table: user, locked: false })
+    expect(calls[2]).toMatchObject({
       op: 'select',
       table: quests,
       locked: true,
     })
     // Las membresías se bloquean justo después de la quest y antes del INSERT.
-    expect(callsBeforeMembershipLock).toBe(2)
-    expect(calls[2]).toMatchObject({ op: 'insert' })
+    expect(callsBeforeMembershipLock).toBe(3)
+    expect(calls[3]).toMatchObject({ op: 'insert' })
     expect(resolveLockedGuildQuestAuth).toHaveBeenCalledWith(
       expect.anything(),
       GUILD,
       MEMBER,
+    )
+  })
+
+  it('no lee el autor mientras retiene los bloqueos', async () => {
+    setupAllowed()
+
+    await createQuestCommentHandler(payload(), MEMBER)
+
+    // Ningún SELECT a `user` después del primer bloqueo: la sección crítica
+    // solo contiene la reverificación y el INSERT.
+    const calls = getDbCalls()
+    const firstLock = calls.findIndex((call) => call.locked)
+    expect(firstLock).toBeGreaterThan(-1)
+    expect(calls.slice(firstLock).some((call) => call.table === user)).toBe(
+      false,
     )
   })
 })
@@ -191,6 +208,7 @@ describe('createQuestCommentHandler — reverificación bloqueada', () => {
   it('lanza Conflict si la quest se borró entre la comprobación y el bloqueo', async () => {
     enqueueSelect([{ guildId: GUILD }])
     vi.mocked(resolveGuildQuestAuth).mockResolvedValue(authContext())
+    enqueueSelect([authorRow()]) // autor, en la comprobación previa
     enqueueSelect([]) // la relectura bloqueada ya no la encuentra
 
     await expect(createQuestCommentHandler(payload(), MEMBER)).rejects.toThrow(
@@ -203,6 +221,7 @@ describe('createQuestCommentHandler — reverificación bloqueada', () => {
   it('propaga el rechazo de la membresía bloqueada sin insertar', async () => {
     enqueueSelect([{ guildId: GUILD }])
     vi.mocked(resolveGuildQuestAuth).mockResolvedValue(authContext())
+    enqueueSelect([authorRow()]) // autor, en la comprobación previa
     enqueueSelect([{ guildId: GUILD }])
     vi.mocked(resolveLockedGuildQuestAuth).mockRejectedValue(
       new Error('Forbidden: you are not a member of this guild'),
@@ -219,12 +238,12 @@ describe('createQuestCommentHandler — reintento por deadlock', () => {
   it('repite la transacción entera una vez y la segunda pasada gana', async () => {
     enqueueSelect([{ guildId: GUILD }])
     vi.mocked(resolveGuildQuestAuth).mockResolvedValue(authContext())
+    enqueueSelect([authorRow()]) // autor, en la comprobación previa
     vi.mocked(resolveLockedGuildQuestAuth).mockResolvedValue(authContext())
     enqueueSelect([{ guildId: GUILD }]) // bloqueo, intento 1
     enqueueError('insert', deadlockError())
     enqueueSelect([{ guildId: GUILD }]) // bloqueo, intento 2
     enqueueInsert([insertedRow()])
-    enqueueSelect([authorRow()])
 
     const item = await createQuestCommentHandler(payload(), MEMBER)
 
@@ -239,6 +258,7 @@ describe('createQuestCommentHandler — reintento por deadlock', () => {
   it('con el deadlock persistente devuelve el Conflict genérico, sin el texto de Postgres', async () => {
     enqueueSelect([{ guildId: GUILD }])
     vi.mocked(resolveGuildQuestAuth).mockResolvedValue(authContext())
+    enqueueSelect([authorRow()]) // autor, en la comprobación previa
     vi.mocked(resolveLockedGuildQuestAuth).mockResolvedValue(authContext())
     enqueueSelect([{ guildId: GUILD }])
     enqueueError('insert', deadlockError())

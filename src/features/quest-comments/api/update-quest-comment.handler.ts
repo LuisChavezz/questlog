@@ -45,6 +45,9 @@ export async function updateQuestCommentHandler(
   if (!canEditGuildQuestComment(viewer, existing)) {
     throw new Error('Forbidden: you can only edit your own comments')
   }
+  // Solo el autor edita, así que el autor es el observador: sus datos de
+  // presentación se leen aquí, sin bloqueo, y no dentro de la transacción.
+  const author = await selectCommentAuthor(userId)
 
   return withDeadlockRetry(
     () =>
@@ -80,8 +83,6 @@ export async function updateQuestCommentHandler(
             'Conflict: your permissions on this comment changed — please refresh and try again',
           )
         }
-
-        const author = await selectCommentAuthor(tx, userId)
 
         // Cuerpo idéntico tras recortar (el esquema ya recortó `data.body`): no
         // es una edición, así que no se escribe ni se marca `edited_at`.

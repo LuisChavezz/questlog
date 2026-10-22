@@ -94,14 +94,13 @@ export async function selectQuestComment(
 
 /**
  * Datos de presentación de un autor por id, para devolver la fila creada o
- * editada con la misma forma que el lector. Sin bloqueo: el nombre o el avatar
- * no participan en ninguna decisión de autorización.
+ * editada con la misma forma que el lector. Se lee en la comprobación previa,
+ * FUERA de la transacción: el nombre o el avatar no participan en ninguna
+ * decisión de autorización, así que no tiene sentido alargar con esta lectura
+ * el tiempo que se retienen los bloqueos de quest, membresía y comentario.
  */
-export async function selectCommentAuthor(
-  tx: GuildQuestAuthTx,
-  userId: string,
-) {
-  const rows = await tx
+export async function selectCommentAuthor(userId: string) {
+  const rows = await db
     .select(questCommentAuthorColumns)
     .from(user)
     .where(eq(user.id, userId))
