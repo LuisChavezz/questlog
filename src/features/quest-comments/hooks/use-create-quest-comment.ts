@@ -17,7 +17,7 @@ import type {
   QuestCommentCacheItem,
   QuestCommentsCache,
 } from '../api/quest-comments-query-options'
-import { restoreCommentDraft, setCommentError } from '../comment-drafts'
+import { keepFailedComment, setCommentError } from '../comment-drafts'
 
 // Id temporal del comentario optimista: nunca coincide con un uuid del servidor.
 let optimisticCounter = 0
@@ -78,8 +78,9 @@ export function useCreateQuestComment(
 
     // Rollback DIRIGIDO: se retira solo este comentario optimista. Restaurar un
     // snapshot de toda la caché borraría también lo que otra publicación o
-    // borrado solapado haya parcheado después. El texto vuelve al borrador (si
-    // está vacío; ver `restoreCommentDraft`) y el error se publica para la quest.
+    // borrado solapado haya parcheado después. El texto nunca se pierde: vuelve
+    // al borrador si está vacío o queda en los no enviados de la quest (ver
+    // `keepFailedComment`), y el error se publica para la quest.
     onError: (error, body, context) => {
       if (context) {
         queryClient.setQueryData<QuestCommentsCache>(queryKey, (cache) =>
@@ -88,7 +89,7 @@ export function useCreateQuestComment(
           ),
         )
       }
-      restoreCommentDraft(questId, body)
+      keepFailedComment(questId, body)
       setCommentError(questId, error.message)
     },
 

@@ -31,7 +31,12 @@ import type {
   QuestCommentCacheItem,
   QuestCommentsCache,
 } from '../api/quest-comments-query-options'
-import { setCommentDraft, setCommentError } from '../comment-drafts'
+import {
+  discardUnsentComment,
+  getUnsentComments,
+  setCommentDraft,
+  setCommentError,
+} from '../comment-drafts'
 import { deferred } from '../hooks/quest-comment-test-fixtures'
 
 const { createQuestCommentMock, deleteQuestCommentMock, getQuestCommentsMock } =
@@ -294,6 +299,9 @@ afterEach(() => {
   for (const questId of ['q-dragon', 'q-caves']) {
     setCommentDraft(questId, '')
     setCommentError(questId, null)
+    while (getUnsentComments(questId).length > 0) {
+      discardUnsentComment(questId)
+    }
   }
 })
 
@@ -551,5 +559,56 @@ describe('Comentarios en el drawer de detalle', () => {
     ).toBe('Conflict: first post failed')
     // Lo que se está escribiendo no se pisa con el texto de la fallida.
     expect(getComposer(drawer)).toHaveProperty('value', 'Third draft')
+
+    // El texto fallido queda apartado: Restore lo recupera intercambiándolo
+    // con lo escrito, que pasa a no enviados en vez de perderse.
+    const form = getCommentForm(drawer)
+    expect(within(form).getByText('Unsent comment')).toBeTruthy()
+    fireEvent.click(within(form).getByRole('button', { name: 'Restore' }))
+    expect(getComposer(drawer)).toHaveProperty('value', 'First')
+    fireEvent.click(within(form).getByRole('button', { name: 'Restore' }))
+    expect(getComposer(drawer)).toHaveProperty('value', 'Third draft')
+
+    // × descarta el que se muestra; sin no enviados, desaparece la acción.
+    fireEvent.click(
+      within(form).getByRole('button', { name: 'Discard unsent comment' }),
+    )
+    expect(within(form).queryByRole('button', { name: 'Restore' })).toBeNull()
+    expect(getComposer(drawer)).toHaveProperty('value', 'Third draft')
+  })
+
+  it('varios fallos se acumulan con su recuento y cada quest guarda los suyos', async () => {
+    getQuestCommentsMock.mockResolvedValue(singlePage([]).pages[0])
+    createQuestCommentMock.mockRejectedValue(new Error('Conflict: post failed'))
+    renderQuests()
+    let drawer = openQuest('Map the caves')
+    const post = (text: string) => {
+      fireEvent.change(getComposer(drawer), { target: { value: text } })
+      fireEvent.click(within(drawer).getByRole('button', { name: 'Comment' }))
+    }
+
+    // Cada fallo llega con el composer ya ocupado por el siguiente texto.
+    post('Failure one')
+    fireEvent.change(getComposer(drawer), { target: { value: 'Typing' } })
+    await waitFor(() =>
+      expect(
+        within(getCommentForm(drawer)).getByText('Unsent comment'),
+      ).toBeTruthy(),
+    )
+    post('Failure two')
+    fireEvent.change(getComposer(drawer), { target: { value: 'Typing' } })
+    await within(getCommentForm(drawer)).findByText('2 unsent comments')
+
+    // Otra quest no ve los no enviados de esta.
+    drawer = openQuest('Slay the dragon')
+    expect(
+      within(getCommentForm(drawer)).queryByRole('button', { name: 'Restore' }),
+    ).toBeNull()
+
+    // Y al volver siguen ahí.
+    drawer = openQuest('Map the caves')
+    expect(
+      within(getCommentForm(drawer)).getByText('2 unsent comments'),
+    ).toBeTruthy()
   })
 })

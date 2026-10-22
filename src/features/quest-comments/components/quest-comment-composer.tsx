@@ -8,7 +8,7 @@
  * (publicar, editar o borrar): está en el pie fijo del drawer, así que se ve
  * aunque el hilo esté desplazado.
  */
-import { SendHorizontal } from 'lucide-react'
+import { RotateCcw, SendHorizontal, X } from 'lucide-react'
 
 import { Button } from '#/components/ui/button'
 import { Textarea } from '#/components/ui/textarea'
@@ -17,9 +17,12 @@ import { getUserInitials } from '#/lib/get-user-initials'
 import { cn } from '#/lib/utils'
 import type { QuestCommentAuthor } from '../api/quest-comment-item'
 import {
+  discardUnsentComment,
+  restoreUnsentComment,
   setCommentDraft,
   useCommentDraft,
   useCommentError,
+  useUnsentComments,
 } from '../comment-drafts'
 import { useCreateQuestComment } from '../hooks/use-create-quest-comment'
 import {
@@ -82,11 +85,7 @@ export function QuestCommentComposer({ questId }: { questId: string }) {
         submit()
       }}
     >
-      {error && (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      )}
+      <CommentNotice questId={questId} error={error} />
 
       <Textarea
         {...{ [QUEST_COMMENT_INPUT_ATTR]: 'true' }}
@@ -125,5 +124,58 @@ export function QuestCommentComposer({ questId }: { questId: string }) {
         </Button>
       </div>
     </form>
+  )
+}
+
+/**
+ * Aviso del pie: el último error de una mutación de comentarios de la quest y,
+ * mientras haya textos de publicaciones fallidas guardados aparte, la acción de
+ * recuperarlos (Restore) o descartar el más reciente (×).
+ */
+function CommentNotice({
+  questId,
+  error,
+}: {
+  questId: string
+  error: string | null
+}) {
+  const unsent = useUnsentComments(questId)
+  if (!error && unsent.length === 0) return null
+
+  return (
+    <div className="flex flex-col gap-1.5 text-sm">
+      {error && (
+        <p role="alert" className="text-destructive">
+          {error}
+        </p>
+      )}
+      {unsent.length > 0 && (
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <span className="flex-1">
+            {unsent.length === 1
+              ? 'Unsent comment'
+              : `${unsent.length} unsent comments`}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            onClick={() => restoreUnsentComment(questId)}
+          >
+            <RotateCcw aria-hidden="true" />
+            Restore
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Discard unsent comment"
+            onClick={() => discardUnsentComment(questId)}
+          >
+            <X aria-hidden="true" />
+          </Button>
+        </div>
+      )}
+    </div>
   )
 }

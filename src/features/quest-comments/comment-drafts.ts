@@ -1,5 +1,6 @@
 // Estado de UI del hilo de comentarios, por quest y SOLO en memoria: el borrador
-// del composer y el último error de una mutación de comentarios. Vive en `Map`s
+// del composer, los textos de publicaciones fallidas que no cupieron en él
+// ("no enviados") y el último error de una mutación de comentarios. Vive en `Map`s
 // a nivel de módulo —no en Zustand ni persistido—, así que sobrevive a cerrar el
 // drawer y a cambiar de quest, y se pierde al recargar la página.
 //
@@ -12,7 +13,12 @@
 import { useCallback, useSyncExternalStore } from 'react'
 
 const drafts = new Map<string, string>()
+// Pila por quest (el último es el más reciente). Se sustituye el array entero en
+// cada cambio, nunca se muta, para que `useSyncExternalStore` vea un snapshot
+// nuevo solo cuando de verdad cambia.
+const unsent = new Map<string, readonly string[]>()
 const errors = new Map<string, string>()
+const NO_UNSENT: readonly string[] = []
 const listeners = new Map<string, Set<() => void>>()
 
 function notify(questId: string) {
@@ -45,19 +51,65 @@ export function setCommentDraft(questId: string, value: string) {
   notify(questId)
 }
 
-/**
- * Devuelve al borrador el texto de una publicación fallida, SOLO si el borrador
- * está vacío: si el usuario ya empezó a escribir otro mientras la publicación
- * estaba en vuelo, ese texto no se pisa. Como el composer lee de este mismo
- * store, restaurar aquí también rellena el textarea si está montado.
- *
- * @returns si el texto se restauró.
- */
-export function restoreCommentDraft(questId: string, body: string): boolean {
-  if (getCommentDraft(questId) !== '') return false
+// ─── Textos no enviados ───────────────────────────────────────────────────────
 
-  setCommentDraft(questId, body)
-  return true
+export function getUnsentComments(questId: string): readonly string[] {
+  return unsent.get(questId) ?? NO_UNSENT
+}
+
+function setUnsentComments(questId: string, texts: readonly string[]) {
+  if (texts.length === 0) {
+    unsent.delete(questId)
+  } else {
+    unsent.set(questId, texts)
+  }
+  notify(questId)
+}
+
+/**
+ * Guarda el texto de una publicación fallida sin perderlo nunca. Si el borrador
+ * está vacío, vuelve al composer (que lee de este mismo store, así que también
+ * rellena el textarea si está montado). Si el usuario ya escribió otra cosa
+ * mientras la publicación estaba en vuelo, ese texto no se pisa: el fallido se
+ * apila en los no enviados de la quest, desde donde se puede restaurar.
+ *
+ * @returns dónde quedó el texto.
+ */
+export function keepFailedComment(
+  questId: string,
+  body: string,
+): 'draft' | 'unsent' {
+  if (getCommentDraft(questId) === '') {
+    setCommentDraft(questId, body)
+    return 'draft'
+  }
+
+  setUnsentComments(questId, [...getUnsentComments(questId), body])
+  return 'unsent'
+}
+
+/**
+ * Lleva al composer el no enviado más reciente. Si el composer tiene texto, ese
+ * texto pasa a los no enviados (como el más reciente) en vez de perderse: es un
+ * intercambio, nunca un descarte.
+ */
+export function restoreUnsentComment(questId: string) {
+  const texts = getUnsentComments(questId)
+  const latest = texts.at(-1)
+  if (latest === undefined) return
+
+  const remaining = texts.slice(0, -1)
+  const current = getCommentDraft(questId)
+  setUnsentComments(
+    questId,
+    current === '' ? remaining : [...remaining, current],
+  )
+  setCommentDraft(questId, latest)
+}
+
+/** Descarta el no enviado que se muestra (el más reciente). */
+export function discardUnsentComment(questId: string) {
+  setUnsentComments(questId, getUnsentComments(questId).slice(0, -1))
 }
 
 // ─── Error de la última mutación ──────────────────────────────────────────────
@@ -92,6 +144,10 @@ function useQuestCommentsStore<T>(questId: string, read: (id: string) => T) {
 
 export function useCommentDraft(questId: string) {
   return useQuestCommentsStore(questId, getCommentDraft)
+}
+
+export function useUnsentComments(questId: string) {
+  return useQuestCommentsStore(questId, getUnsentComments)
 }
 
 export function useCommentError(questId: string) {
