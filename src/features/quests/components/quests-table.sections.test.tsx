@@ -196,7 +196,13 @@ afterEach(() => {
   cleanup()
 })
 
-describe('Quests page — una tabla por origen', () => {
+// Timeout de 15 s por describe: estos tests montan la página `/quests` completa
+// (DataTable + Radix) bajo jsdom y, con la suite entera en paralelo, superan los
+// 5 s por defecto aunque en solitario tarden 1-4 s. Es tiempo de pared, no
+// lógica colgada. Aligerarlos (montar menos árbol por test) queda pendiente.
+const SLOW = { timeout: 15_000 }
+
+describe('Quests page — una tabla por origen', SLOW, () => {
   it('pinta la sección personal y una por cada guild con quests', () => {
     renderQuests([
       makeQuest({ id: 'q-personal', title: 'Buy milk' }),
@@ -273,7 +279,7 @@ describe('Quests page — una tabla por origen', () => {
   })
 })
 
-describe('Quests page — columnas y filtros por origen', () => {
+describe('Quests page — columnas y filtros por origen', SLOW, () => {
   it('la tabla personal no tiene columnas ni filtros de asignación', async () => {
     renderQuests([
       makeQuest({ id: 'q-personal', title: 'Buy milk' }),
@@ -351,7 +357,7 @@ describe('Quests page — columnas y filtros por origen', () => {
   })
 })
 
-describe('Quests page — estado independiente por tabla', () => {
+describe('Quests page — estado independiente por tabla', SLOW, () => {
   it('filtrar en una tabla no toca a las demás', () => {
     renderQuests([
       makeQuest({ id: 'q-personal', title: 'Buy milk' }),
@@ -434,7 +440,7 @@ describe('Quests page — estado independiente por tabla', () => {
   })
 })
 
-describe('Quests page — permisos heredados de la tabla de guild', () => {
+describe('Quests page — permisos heredados de la tabla de guild', SLOW, () => {
   it('deja en solo lectura la quest que el usuario solo supervisa', () => {
     // El usuario es Member de este guild y no creó la quest: solo puede mover
     // el estado (eje 2). Se usa un guild donde NO es el dueño estructural.
@@ -501,7 +507,7 @@ describe('Quests page — permisos heredados de la tabla de guild', () => {
   })
 })
 
-describe('Quests page — recuperación del roster de guild perdido', () => {
+describe('Quests page — recuperación del roster de guild perdido', SLOW, () => {
   // `['quests']` puede traer una quest de un guild que `['quest-guilds']`
   // todavía no conoce; QuestsTable lo detecta y refresca el roster. Este test
   // fija que, si el MISMO guild vuelve a faltar más tarde (una incidencia
