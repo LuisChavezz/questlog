@@ -9,7 +9,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 
 import {
+  discardUnsentComment,
   getCommentDraft,
+  getUnsentComments,
   getCommentError,
   setCommentDraft,
   setCommentError,
@@ -56,6 +58,9 @@ afterEach(() => {
   createQuestCommentMock.mockReset()
   setCommentDraft(QUEST_ID, '')
   setCommentError(QUEST_ID, null)
+  while (getUnsentComments(QUEST_ID).length > 0) {
+    discardUnsentComment(QUEST_ID)
+  }
 })
 
 describe('useCreateQuestComment', () => {
@@ -123,7 +128,8 @@ describe('useCreateQuestComment', () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true))
     expect(getCommentDraft(QUEST_ID)).toBe('Something else')
-    // El error se publica igual, aunque el texto no se pudiera restaurar.
+    // El texto fallido no se pierde: queda apartado en los no enviados.
+    expect(getUnsentComments(QUEST_ID)).toEqual(['Hello guild'])
     expect(getCommentError(QUEST_ID)).toBe('Forbidden: nope')
   })
 
