@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useForm } from '@tanstack/react-form'
+import { revalidateLogic, useForm } from '@tanstack/react-form'
 
 import {
   guildDescriptionSchema,
@@ -33,6 +33,12 @@ export function useCreateGuildForm(onSuccess?: () => void) {
 
   const form = useForm({
     defaultValues,
+    // Sin errores hasta el primer intento de envío; a partir de ahí cada
+    // cambio revalida. Solo gobierna los validadores `onDynamic`.
+    validationLogic: revalidateLogic(),
+    // Cada envío vuelve a validar y muestra los errores vigentes; `onSubmit`
+    // solo corre si todos los campos son válidos.
+    canSubmitWhenInvalid: true,
     onSubmit: async ({ value }) => {
       // El error queda capturado en createGuild.error; se evita propagar el
       // rechazo para no romper el flujo de submit del formulario.
@@ -41,7 +47,8 @@ export function useCreateGuildForm(onSuccess?: () => void) {
   })
 
   // Actualiza el nombre y deriva el slug salvo que el usuario lo haya editado.
-  // setFieldValue valida y marca el campo como tocado automáticamente.
+  // setFieldValue marca el campo como tocado y lo valida (con revalidateLogic,
+  // solo tiene efecto visible después del primer intento de envío).
   const handleNameChange = (value: string) => {
     form.setFieldValue('name', value)
 
@@ -62,19 +69,19 @@ export function useCreateGuildForm(onSuccess?: () => void) {
   // Validadores de campo reutilizando los esquemas de Zod
   const validators = {
     name: {
-      onChange: ({ value }: { value: string }) => {
+      onDynamic: ({ value }: { value: string }) => {
         const result = guildNameSchema.safeParse(value)
         return result.success ? undefined : result.error.issues[0]?.message
       },
     },
     slug: {
-      onChange: ({ value }: { value: string }) => {
+      onDynamic: ({ value }: { value: string }) => {
         const result = guildSlugSchema.safeParse(value)
         return result.success ? undefined : result.error.issues[0]?.message
       },
     },
     description: {
-      onChange: ({ value }: { value: string | undefined }) => {
+      onDynamic: ({ value }: { value: string | undefined }) => {
         const result = guildDescriptionSchema.safeParse(value)
         return result.success ? undefined : result.error.issues[0]?.message
       },

@@ -1,7 +1,7 @@
 // Hook que encapsula la lógica del formulario de perfil del guild — mismo
 // reparto que useCreateGuildForm: validación por campo con los esquemas de Zod
 // y la mutación acá, el UI aparte (guild-profile-form.tsx).
-import { useForm } from '@tanstack/react-form'
+import { revalidateLogic, useForm } from '@tanstack/react-form'
 
 import {
   editableGuildDescriptionSchema,
@@ -28,23 +28,40 @@ export function useUpdateGuildForm(
 
   const form = useForm({
     defaultValues: currentValues,
+    // Sin errores hasta el primer intento de envío; a partir de ahí cada
+    // cambio revalida. Solo gobierna los validadores `onDynamic`.
+    validationLogic: revalidateLogic(),
+    // Cada envío vuelve a validar y muestra los errores vigentes; `onSubmit`
+    // solo corre si todos los campos son válidos.
+    canSubmitWhenInvalid: true,
     onSubmit: async ({ value }) => {
-      // El error queda capturado en updateGuild.error; se evita propagar el
-      // rechazo para no romper el flujo de submit del formulario.
-      await updateGuild.mutateAsync(value).catch(() => {})
+      try {
+        await updateGuild.mutateAsync(value)
+      } catch {
+        // El error queda capturado en updateGuild.error; se evita propagar el
+        // rechazo para no romper el flujo de submit del formulario.
+        return
+      }
+
+      // Guardado: el formulario vuelve a la validación diferida hasta el
+      // próximo envío. `keepDefaultValues` deja los valores por defecto en
+      // manos de las props: cuando el refetch del guild las cambie, `useForm`
+      // sincroniza los valores (el formulario ya no está tocado) y
+      // `hasChanges` sigue comparando contra lo guardado.
+      form.reset(value, { keepDefaultValues: true })
     },
   })
 
   // Validadores de campo reutilizando los esquemas de Zod
   const validators = {
     name: {
-      onChange: ({ value }: { value: string }) => {
+      onDynamic: ({ value }: { value: string }) => {
         const result = guildNameSchema.safeParse(value)
         return result.success ? undefined : result.error.issues[0]?.message
       },
     },
     description: {
-      onChange: ({ value }: { value: string }) => {
+      onDynamic: ({ value }: { value: string }) => {
         const result = editableGuildDescriptionSchema.safeParse(value)
         return result.success ? undefined : result.error.issues[0]?.message
       },

@@ -6,7 +6,13 @@
 // corresponden y con el título correcto.
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 
 import type { MemberOption } from './member-select'
 import { CreateQuestDialog } from './create-quest-dialog'
@@ -85,5 +91,35 @@ describe('CreateQuestDialog — modo guild', () => {
     // Y quedan accesibles por su aria-label (dos comboboxes de miembro).
     expect(screen.getByRole('combobox', { name: 'Assignee' })).not.toBeNull()
     expect(screen.getByRole('combobox', { name: 'Supervisor' })).not.toBeNull()
+  })
+})
+
+// Timeout de 15 s por describe, como los demás tests pesados de quests: monta
+// el diálogo real (Radix Dialog + Select) bajo jsdom y, con la suite entera en
+// paralelo, puede superar los 5 s por defecto. Es tiempo de pared, no lógica
+// colgada.
+const SLOW = { timeout: 15_000 }
+
+describe('CreateQuestDialog — momento de la validación', SLOW, () => {
+  it('no marca el título vacío hasta el envío y luego revalida en vivo', async () => {
+    renderDialog()
+
+    // Escribir y borrar el título antes de enviar no muestra error.
+    const title = screen.getByLabelText(/Title/)
+    fireEvent.change(title, { target: { value: 'Draft' } })
+    fireEvent.change(title, { target: { value: '' } })
+    fireEvent.blur(title)
+    expect(screen.queryByText('Title is required')).toBeNull()
+
+    const submit = screen.getByRole('button', { name: 'Create Quest' })
+    expect(submit.hasAttribute('disabled')).toBe(false)
+    fireEvent.click(submit)
+
+    expect(await screen.findByText('Title is required')).not.toBeNull()
+
+    fireEvent.change(title, { target: { value: 'Slay the dragon' } })
+    await waitFor(() => {
+      expect(screen.queryByText('Title is required')).toBeNull()
+    })
   })
 })

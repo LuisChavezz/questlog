@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useForm } from '@tanstack/react-form'
+import { revalidateLogic, useForm } from '@tanstack/react-form'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { createQuest } from '../api/create-quest'
@@ -55,6 +55,12 @@ export function useCreateQuestForm({
 
   const form = useForm({
     defaultValues,
+    // Sin errores hasta el primer intento de envío; a partir de ahí cada
+    // cambio revalida. Solo gobierna los validadores `onDynamic`.
+    validationLogic: revalidateLogic(),
+    // Cada envío vuelve a validar y muestra los errores vigentes; `onSubmit`
+    // solo corre si todos los campos son válidos.
+    canSubmitWhenInvalid: true,
     onSubmit: async ({ value }) => {
       setServerError(null)
 
@@ -91,25 +97,25 @@ export function useCreateQuestForm({
   // (pertenencia al guild) se comprueba en el servidor, no por campo.
   const validators = {
     title: {
-      onChange: ({ value }: { value: string }) => {
+      onDynamic: ({ value }: { value: string }) => {
         const result = questTitleSchema.safeParse(value)
         return result.success ? undefined : result.error.issues[0]?.message
       },
     },
     description: {
-      onChange: ({ value }: { value: string | undefined }) => {
+      onDynamic: ({ value }: { value: string | undefined }) => {
         const result = questDescriptionSchema.safeParse(value)
         return result.success ? undefined : result.error.issues[0]?.message
       },
     },
     priority: {
-      onChange: ({ value }: { value: string }) => {
+      onDynamic: ({ value }: { value: string }) => {
         const result = questPrioritySchema.safeParse(value)
         return result.success ? undefined : result.error.issues[0]?.message
       },
     },
     dueDate: {
-      onChange: ({ value }: { value: string | undefined }) => {
+      onDynamic: ({ value }: { value: string | undefined }) => {
         const result = questDueDateSchema.safeParse(value)
         return result.success ? undefined : result.error.issues[0]?.message
       },

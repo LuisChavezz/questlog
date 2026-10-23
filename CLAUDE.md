@@ -133,6 +133,8 @@ Cascade decisions that carry meaning:
 
 Per-field Zod schemas are defined once per feature (`features/quests/schemas/quest-schemas.ts`, `features/guilds/schemas/guild-schemas.ts`, …) and reused by the create forms, the inline editors, and the server `.inputValidator`. Extend them there, never inline at a call site.
 
+**Validation timing (TanStack Form forms):** submit-gated. Every `useForm` sets `validationLogic: revalidateLogic()` (TanStack Form 1.29.1: no field errors before the first submit attempt, then revalidation on every change) and `canSubmitWhenInvalid: true`, and field validators are **`onDynamic`** — `revalidateLogic` governs only `onDynamic`, so an `onChange` validator would still fire on every keystroke. Submit buttons are disabled only while `isSubmitting` (plus domain conditions such as "no changes"), **never on validity**: with `canSubmit` false, `handleSubmit` returns without revalidating, so a disabled or no-op button would hide errors. `canSubmitWhenInvalid` makes every submit re-run validation; `onSubmit` still never runs while a field is invalid. A form that stays mounted after a successful submit resets (`form.reset(value, { keepDefaultValues: true })` when its defaults follow props refreshed after the save) so it returns to submit-gated mode. Error display is just `field.state.meta.errors.length > 0`.
+
 **Date gotcha:** due dates are stored as **UTC midnight** and compared as `YYYY-MM-DD` strings, never as `Date` objects, to avoid client/server timezone drift. Use the helpers (`parseQuestDueDateValue`, `getQuestDateInputValue`, `getTodayDateString`, `isQuestDueDateOverdue`, `isQuestDueDateSoon`, `formatQuestDueDate`) — don't reimplement date math. "Overdue" is a single predicate: due date in the past **and** status not in `['done', 'cancelled']`; `get-guild.ts` replicates it in SQL and must stay in step.
 
 ### Routing & guards
@@ -154,7 +156,7 @@ Auth wiring: `lib/auth.ts` (server) ↔ `lib/auth-client.ts` (browser) — the c
 
 ### Testing
 
-46 test files (45 under `src/` plus `scripts/build-avatars.test.ts`), Vitest 4. There is **no global Vitest config**: each file declares its environment with a line-1 pragma — `// @vitest-environment node` for handlers and logic, `// @vitest-environment jsdom` for components and hooks.
+53 test files (52 under `src/` plus `scripts/build-avatars.test.ts`), Vitest 4. There is **no global Vitest config**: each file declares its environment with a line-1 pragma — `// @vitest-environment node` for handlers and logic, `// @vitest-environment jsdom` for components and hooks.
 
 - `src/test/drizzle-stub.ts` is a chainable, _thenable_ Drizzle fake. Mock with `vi.mock('#/db', async () => ({ db: (await import('#/test/drizzle-stub')).dbStub }))`, then `enqueueSelect/Update/Insert/Delete` results in the order the handler issues its queries (one queue per operation; `transaction(cb)` calls `cb(dbStub)`, so locked reads share the queues). `enqueueError('update', err)` simulates an engine failure mid-sequence — that's how the deadlock paths are covered.
 - `getDbCalls()` returns `{ op, table, set, values, where, orderBy, locked, returning }` per operation, which is how tests assert on things absent from the return value: that a re-read used `.for('update')`, what the audit log wrote, the `WHERE` scope of a DELETE, or that a paginated query carried its tiebreaker.
