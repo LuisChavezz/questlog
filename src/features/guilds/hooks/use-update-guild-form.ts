@@ -1,8 +1,12 @@
 // Hook que encapsula la lógica del formulario de perfil del guild — mismo
 // reparto que useCreateGuildForm: validación por campo con los esquemas de Zod
 // y la mutación acá, el UI aparte (guild-profile-form.tsx).
-import { revalidateLogic, useForm } from '@tanstack/react-form'
+import { useForm } from '@tanstack/react-form'
 
+import {
+  submitGatedFormOptions,
+  zodFieldValidator,
+} from '#/lib/form-validation'
 import {
   editableGuildDescriptionSchema,
   guildNameSchema,
@@ -28,12 +32,7 @@ export function useUpdateGuildForm(
 
   const form = useForm({
     defaultValues: currentValues,
-    // Sin errores hasta el primer intento de envío; a partir de ahí cada
-    // cambio revalida. Solo gobierna los validadores `onDynamic`.
-    validationLogic: revalidateLogic(),
-    // Cada envío vuelve a validar y muestra los errores vigentes; `onSubmit`
-    // solo corre si todos los campos son válidos.
-    canSubmitWhenInvalid: true,
+    ...submitGatedFormOptions,
     onSubmit: async ({ value }) => {
       try {
         await updateGuild.mutateAsync(value)
@@ -55,16 +54,10 @@ export function useUpdateGuildForm(
   // Validadores de campo reutilizando los esquemas de Zod
   const validators = {
     name: {
-      onDynamic: ({ value }: { value: string }) => {
-        const result = guildNameSchema.safeParse(value)
-        return result.success ? undefined : result.error.issues[0]?.message
-      },
+      onDynamic: zodFieldValidator(guildNameSchema),
     },
     description: {
-      onDynamic: ({ value }: { value: string }) => {
-        const result = editableGuildDescriptionSchema.safeParse(value)
-        return result.success ? undefined : result.error.issues[0]?.message
-      },
+      onDynamic: zodFieldValidator(editableGuildDescriptionSchema),
     },
   }
 

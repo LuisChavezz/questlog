@@ -1,7 +1,11 @@
 import { useState } from 'react'
-import { revalidateLogic, useForm } from '@tanstack/react-form'
+import { useForm } from '@tanstack/react-form'
 import { useQueryClient } from '@tanstack/react-query'
 
+import {
+  submitGatedFormOptions,
+  zodFieldValidator,
+} from '#/lib/form-validation'
 import { createQuest } from '../api/create-quest'
 import {
   questTitleSchema,
@@ -55,12 +59,7 @@ export function useCreateQuestForm({
 
   const form = useForm({
     defaultValues,
-    // Sin errores hasta el primer intento de envío; a partir de ahí cada
-    // cambio revalida. Solo gobierna los validadores `onDynamic`.
-    validationLogic: revalidateLogic(),
-    // Cada envío vuelve a validar y muestra los errores vigentes; `onSubmit`
-    // solo corre si todos los campos son válidos.
-    canSubmitWhenInvalid: true,
+    ...submitGatedFormOptions,
     onSubmit: async ({ value }) => {
       setServerError(null)
 
@@ -97,28 +96,16 @@ export function useCreateQuestForm({
   // (pertenencia al guild) se comprueba en el servidor, no por campo.
   const validators = {
     title: {
-      onDynamic: ({ value }: { value: string }) => {
-        const result = questTitleSchema.safeParse(value)
-        return result.success ? undefined : result.error.issues[0]?.message
-      },
+      onDynamic: zodFieldValidator(questTitleSchema),
     },
     description: {
-      onDynamic: ({ value }: { value: string | undefined }) => {
-        const result = questDescriptionSchema.safeParse(value)
-        return result.success ? undefined : result.error.issues[0]?.message
-      },
+      onDynamic: zodFieldValidator(questDescriptionSchema),
     },
     priority: {
-      onDynamic: ({ value }: { value: string }) => {
-        const result = questPrioritySchema.safeParse(value)
-        return result.success ? undefined : result.error.issues[0]?.message
-      },
+      onDynamic: zodFieldValidator(questPrioritySchema),
     },
     dueDate: {
-      onDynamic: ({ value }: { value: string | undefined }) => {
-        const result = questDueDateSchema.safeParse(value)
-        return result.success ? undefined : result.error.issues[0]?.message
-      },
+      onDynamic: zodFieldValidator(questDueDateSchema),
     },
   }
 

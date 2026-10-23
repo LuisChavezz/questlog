@@ -1,5 +1,9 @@
-import { revalidateLogic, useForm } from '@tanstack/react-form'
+import { useForm } from '@tanstack/react-form'
 
+import {
+  submitGatedFormOptions,
+  zodFieldValidator,
+} from '#/lib/form-validation'
 import { userNameSchema } from '../schemas/user-schemas'
 import type { UpdateUserValues } from '../schemas/user-schemas'
 import { useUpdateUser } from './use-update-user'
@@ -14,12 +18,7 @@ export function useUpdateUserForm(currentName: string, onSuccess?: () => void) {
 
   const form = useForm({
     defaultValues,
-    // Sin errores hasta el primer intento de envío; a partir de ahí cada
-    // cambio revalida. Solo gobierna los validadores `onDynamic`.
-    validationLogic: revalidateLogic(),
-    // Cada envío vuelve a validar y muestra los errores vigentes; `onSubmit`
-    // solo corre si todos los campos son válidos.
-    canSubmitWhenInvalid: true,
+    ...submitGatedFormOptions,
     onSubmit: async ({ value }) => {
       try {
         await updateUser.mutateAsync(value)
@@ -40,10 +39,7 @@ export function useUpdateUserForm(currentName: string, onSuccess?: () => void) {
 
   const validators = {
     name: {
-      onDynamic: ({ value }: { value: string }) => {
-        const result = userNameSchema.safeParse(value)
-        return result.success ? undefined : result.error.issues[0]?.message
-      },
+      onDynamic: zodFieldValidator(userNameSchema),
     },
   }
 
