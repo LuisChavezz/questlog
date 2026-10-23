@@ -123,3 +123,53 @@ describe('CreateQuestDialog — momento de la validación', SLOW, () => {
     })
   })
 })
+
+// Formas de cerrar el diálogo sin crear. El clic fuera no se simula aquí (Radix
+// lo detecta con pointer events que jsdom no reproduce fielmente); comparte
+// con estas la misma ruta `onOpenChange(false)`.
+const CLOSE_PATHS = [
+  [
+    'Cancel',
+    () => fireEvent.click(screen.getByRole('button', { name: 'Cancel' })),
+  ],
+  [
+    'la X',
+    () => fireEvent.click(screen.getByRole('button', { name: 'Close' })),
+  ],
+  [
+    'Escape',
+    () => fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' }),
+  ],
+] as const
+
+describe('CreateQuestDialog — reapertura limpia', SLOW, () => {
+  it.each(CLOSE_PATHS)(
+    'cerrar con %s descarta lo tecleado, los errores y el estado de envío',
+    async (_path, close) => {
+      renderDialog()
+
+      fireEvent.change(screen.getByLabelText('Description'), {
+        target: { value: 'Draft notes' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Create Quest' }))
+      expect(await screen.findByText('Title is required')).not.toBeNull()
+
+      close()
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).toBeNull()
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'New Quest' }))
+
+      expect(screen.queryByText('Title is required')).toBeNull()
+      expect(
+        screen.getByLabelText<HTMLTextAreaElement>('Description').value,
+      ).toBe('')
+
+      // Sin envío previo: escribir y borrar el título no muestra el error.
+      const title = screen.getByLabelText(/Title/)
+      fireEvent.change(title, { target: { value: 'Draft' } })
+      fireEvent.change(title, { target: { value: '' } })
+      expect(screen.queryByText('Title is required')).toBeNull()
+    },
+  )
+})

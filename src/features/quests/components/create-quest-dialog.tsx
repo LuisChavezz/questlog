@@ -53,13 +53,22 @@ interface CreateQuestDialogProps {
 export function CreateQuestDialog({ guild }: CreateQuestDialogProps = {}) {
   const [open, setOpen] = useState(false)
 
-  const { form, validators, serverError, minDueDate } = useCreateQuestForm({
-    guild: guild && { guildId: guild.guildId, slug: guild.slug },
-    onSuccess: () => setOpen(false),
-  })
+  const { form, validators, serverError, minDueDate, reset } =
+    useCreateQuestForm({
+      guild: guild && { guildId: guild.guildId, slug: guild.slug },
+      onSuccess: () => setOpen(false),
+    })
+
+  // Todo cierre (Cancel, la X, Escape, clic fuera) pasa por aquí y deja el
+  // formulario limpio: reabrir nunca muestra lo tecleado, errores ni el estado
+  // de un envío anterior. El cierre tras crear ya resetea en el propio submit.
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen)
+    if (!nextOpen) reset()
+  }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button size="sm" className="gap-1.5">
           <Plus className="size-4" aria-hidden="true" />
@@ -276,7 +285,7 @@ export function CreateQuestDialog({ guild }: CreateQuestDialogProps = {}) {
             <Button
               type="button"
               variant="ghost"
-              onClick={() => setOpen(false)}
+              onClick={() => handleOpenChange(false)}
             >
               Cancel
             </Button>
