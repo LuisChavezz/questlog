@@ -109,5 +109,13 @@ export function useCreateQuestForm({
     },
   }
 
-  return { form, validators, serverError, minDueDate }
+  // Descarta lo tecleado, los errores, el estado de envío (vuelve la validación
+  // diferida) y el error de servidor. El diálogo lo llama al cerrarse: el hook
+  // vive fuera de su contenido, así que el formulario sobrevive al cierre.
+  const reset = () => {
+    form.reset()
+    setServerError(null)
+  }
+
+  return { form, validators, serverError, minDueDate, reset }
 }
