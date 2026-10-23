@@ -1,8 +1,12 @@
 import { useNavigate, useSearch } from '@tanstack/react-router'
-import { revalidateLogic, useForm } from '@tanstack/react-form'
+import { useForm } from '@tanstack/react-form'
 import { useState } from 'react'
 
 import { authClient } from '#/lib/auth-client'
+import {
+  submitGatedFormOptions,
+  zodFieldValidator,
+} from '#/lib/form-validation'
 import {
   emailSchema,
   getSafeRedirect,
@@ -24,12 +28,7 @@ export function useRegisterForm() {
       password: '',
       confirmPassword: '',
     },
-    // Sin errores hasta el primer intento de envío; a partir de ahí cada
-    // cambio revalida. Solo gobierna los validadores `onDynamic`.
-    validationLogic: revalidateLogic(),
-    // Cada envío vuelve a validar y muestra los errores vigentes; `onSubmit`
-    // solo corre si todos los campos son válidos.
-    canSubmitWhenInvalid: true,
+    ...submitGatedFormOptions,
     onSubmit: async ({ value }) => {
       setServerError(null)
 
@@ -57,22 +56,13 @@ export function useRegisterForm() {
   // al valor actual de `password` sin necesidad de `fieldApi`.
   const validators = {
     name: {
-      onDynamic: ({ value }: { value: string }) => {
-        const result = nameSchema.safeParse(value)
-        return result.success ? undefined : result.error.issues[0]?.message
-      },
+      onDynamic: zodFieldValidator(nameSchema),
     },
     email: {
-      onDynamic: ({ value }: { value: string }) => {
-        const result = emailSchema.safeParse(value)
-        return result.success ? undefined : result.error.issues[0]?.message
-      },
+      onDynamic: zodFieldValidator(emailSchema),
     },
     password: {
-      onDynamic: ({ value }: { value: string }) => {
-        const result = registerPasswordSchema.safeParse(value)
-        return result.success ? undefined : result.error.issues[0]?.message
-      },
+      onDynamic: zodFieldValidator(registerPasswordSchema),
     },
     confirmPassword: {
       onDynamic: ({ value }: { value: string }) => {
