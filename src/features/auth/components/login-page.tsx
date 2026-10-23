@@ -56,9 +56,7 @@ export function LoginPage() {
           {/* Campo: Email */}
           <form.Field name="email" validators={validators.email}>
             {(field) => {
-              const hasError =
-                field.state.meta.isTouched &&
-                field.state.meta.errors.length > 0
+              const hasError = field.state.meta.errors.length > 0
               return (
                 <div className="space-y-1.5">
                   <Label htmlFor={field.name}>Email</Label>
@@ -101,9 +99,7 @@ export function LoginPage() {
           {/* Campo: Contraseña */}
           <form.Field name="password" validators={validators.password}>
             {(field) => {
-              const hasError =
-                field.state.meta.isTouched &&
-                field.state.meta.errors.length > 0
+              const hasError = field.state.meta.errors.length > 0
               return (
                 <div className="space-y-1.5">
                   <Label htmlFor={field.name}>Password</Label>
@@ -168,16 +164,11 @@ export function LoginPage() {
           )}
 
           {/* Botón de envío */}
-          <form.Subscribe
-            selector={(state) => ({
-              canSubmit: state.canSubmit,
-              isSubmitting: state.isSubmitting,
-            })}
-          >
-            {({ canSubmit, isSubmitting }) => (
+          <form.Subscribe selector={(state) => state.isSubmitting}>
+            {(isSubmitting) => (
               <Button
                 type="submit"
-                disabled={!canSubmit || isSubmitting}
+                disabled={isSubmitting}
                 className="w-full border-0 bg-linear-to-br from-(--lagoon) to-(--palm) text-white shadow-md shadow-(--lagoon)/20 transition-opacity hover:opacity-90"
               >
                 {isSubmitting ? 'Signing in…' : 'Sign in'}

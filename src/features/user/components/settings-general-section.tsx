@@ -56,8 +56,7 @@ export function SettingsGeneralSection({
       {/* Campo: Name */}
       <form.Field name="name" validators={validators.name}>
         {(field) => {
-          const hasError =
-            field.state.meta.isTouched && field.state.meta.errors.length > 0
+          const hasError = field.state.meta.errors.length > 0
           return (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={field.name}>
@@ -91,11 +90,9 @@ export function SettingsGeneralSection({
 
       {/* Acciones */}
       <div className="flex justify-end pt-1">
-        <form.Subscribe
-          selector={(state) => [state.canSubmit, state.isSubmitting]}
-        >
-          {([canSubmit, isSubmitting]) => (
-            <Button type="submit" disabled={!canSubmit || isSubmitting}>
+        <form.Subscribe selector={(state) => state.isSubmitting}>
+          {(isSubmitting) => (
+            <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Saving...' : 'Save'}
             </Button>
           )}

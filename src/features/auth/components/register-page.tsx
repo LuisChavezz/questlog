@@ -57,9 +57,7 @@ export function RegisterPage() {
           {/* Campo: Nombre */}
           <form.Field name="name" validators={validators.name}>
             {(field) => {
-              const hasError =
-                field.state.meta.isTouched &&
-                field.state.meta.errors.length > 0
+              const hasError = field.state.meta.errors.length > 0
               return (
                 <div className="space-y-1.5">
                   <Label htmlFor={field.name}>Full name</Label>
@@ -102,9 +100,7 @@ export function RegisterPage() {
           {/* Campo: Email */}
           <form.Field name="email" validators={validators.email}>
             {(field) => {
-              const hasError =
-                field.state.meta.isTouched &&
-                field.state.meta.errors.length > 0
+              const hasError = field.state.meta.errors.length > 0
               return (
                 <div className="space-y-1.5">
                   <Label htmlFor={field.name}>Email</Label>
@@ -147,9 +143,7 @@ export function RegisterPage() {
           {/* Campo: Contraseña */}
           <form.Field name="password" validators={validators.password}>
             {(field) => {
-              const hasError =
-                field.state.meta.isTouched &&
-                field.state.meta.errors.length > 0
+              const hasError = field.state.meta.errors.length > 0
               return (
                 <div className="space-y-1.5">
                   <Label htmlFor={field.name}>Password</Label>
@@ -207,15 +201,13 @@ export function RegisterPage() {
           <form.Field
             name="confirmPassword"
             validators={{
-              // Revalida cuando cambia 'password' para detectar discrepancias en tiempo real
+              // Tras el primer envío, revalida también cuando cambia 'password'
               onChangeListenTo: ['password'],
               ...validators.confirmPassword,
             }}
           >
             {(field) => {
-              const hasError =
-                field.state.meta.isTouched &&
-                field.state.meta.errors.length > 0
+              const hasError = field.state.meta.errors.length > 0
               return (
                 <div className="space-y-1.5">
                   <Label htmlFor={field.name}>Confirm password</Label>
@@ -282,16 +274,11 @@ export function RegisterPage() {
           )}
 
           {/* Botón de envío */}
-          <form.Subscribe
-            selector={(state) => ({
-              canSubmit: state.canSubmit,
-              isSubmitting: state.isSubmitting,
-            })}
-          >
-            {({ canSubmit, isSubmitting }) => (
+          <form.Subscribe selector={(state) => state.isSubmitting}>
+            {(isSubmitting) => (
               <Button
                 type="submit"
-                disabled={!canSubmit || isSubmitting}
+                disabled={isSubmitting}
                 className="w-full border-0 bg-linear-to-br from-(--lagoon) to-(--palm) text-white shadow-md shadow-(--lagoon)/20 transition-opacity hover:opacity-90"
               >
                 {isSubmitting ? 'Creating account…' : 'Create account'}

@@ -47,8 +47,7 @@ export function GuildProfileForm({
       {/* Campo: Name */}
       <form.Field name="name" validators={validators.name}>
         {(field) => {
-          const hasError =
-            field.state.meta.isTouched && field.state.meta.errors.length > 0
+          const hasError = field.state.meta.errors.length > 0
           return (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={field.name}>
@@ -76,8 +75,7 @@ export function GuildProfileForm({
       {/* Campo: Description — vaciarlo es la forma de borrar la descripción */}
       <form.Field name="description" validators={validators.description}>
         {(field) => {
-          const hasError =
-            field.state.meta.isTouched && field.state.meta.errors.length > 0
+          const hasError = field.state.meta.errors.length > 0
           return (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={field.name}>Description</Label>
@@ -117,19 +115,18 @@ export function GuildProfileForm({
 
       <form.Subscribe
         selector={(state) => ({
-          canSubmit: state.canSubmit,
           isSubmitting: state.isSubmitting,
           values: state.values,
         })}
       >
-        {({ canSubmit, isSubmitting, values }) => {
+        {({ isSubmitting, values }) => {
           const changed = hasChanges(values)
           return (
             <div className="flex items-center gap-3">
               <Button
                 type="submit"
                 className="w-fit"
-                disabled={!canSubmit || isSubmitting || !changed}
+                disabled={isSubmitting || !changed}
               >
                 {isSubmitting ? 'Saving…' : 'Save Changes'}
               </Button>

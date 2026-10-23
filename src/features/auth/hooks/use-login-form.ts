@@ -1,5 +1,5 @@
 import { useNavigate, useSearch } from '@tanstack/react-router'
-import { useForm } from '@tanstack/react-form'
+import { revalidateLogic, useForm } from '@tanstack/react-form'
 import { useState } from 'react'
 
 import { authClient } from '#/lib/auth-client'
@@ -21,6 +21,12 @@ export function useLoginForm() {
       email: '',
       password: '',
     },
+    // Sin errores hasta el primer intento de envío; a partir de ahí cada
+    // cambio revalida. Solo gobierna los validadores `onDynamic`.
+    validationLogic: revalidateLogic(),
+    // Cada envío vuelve a validar y muestra los errores vigentes; `onSubmit`
+    // solo corre si todos los campos son válidos.
+    canSubmitWhenInvalid: true,
     onSubmit: async ({ value }) => {
       setServerError(null)
 
@@ -45,13 +51,13 @@ export function useLoginForm() {
   // Validadores de campo exportados para reutilización en el componente
   const validators = {
     email: {
-      onChange: ({ value }: { value: string }) => {
+      onDynamic: ({ value }: { value: string }) => {
         const result = emailSchema.safeParse(value)
         return result.success ? undefined : result.error.issues[0]?.message
       },
     },
     password: {
-      onChange: ({ value }: { value: string }) => {
+      onDynamic: ({ value }: { value: string }) => {
         const result = passwordSchema.safeParse(value)
         return result.success ? undefined : result.error.issues[0]?.message
       },

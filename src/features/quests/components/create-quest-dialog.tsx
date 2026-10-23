@@ -89,8 +89,7 @@ export function CreateQuestDialog({ guild }: CreateQuestDialogProps = {}) {
           {/* Campo: Title */}
           <form.Field name="title" validators={validators.title}>
             {(field) => {
-              const hasError =
-                field.state.meta.isTouched && field.state.meta.errors.length > 0
+              const hasError = field.state.meta.errors.length > 0
               return (
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor={field.name}>
@@ -118,8 +117,7 @@ export function CreateQuestDialog({ guild }: CreateQuestDialogProps = {}) {
           {/* Campo: Description */}
           <form.Field name="description" validators={validators.description}>
             {(field) => {
-              const hasError =
-                field.state.meta.isTouched && field.state.meta.errors.length > 0
+              const hasError = field.state.meta.errors.length > 0
               return (
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor={field.name}>Description</Label>
@@ -235,8 +233,7 @@ export function CreateQuestDialog({ guild }: CreateQuestDialogProps = {}) {
           {/* Campo: Due Date */}
           <form.Field name="dueDate" validators={validators.dueDate}>
             {(field) => {
-              const hasError =
-                field.state.meta.isTouched && field.state.meta.errors.length > 0
+              const hasError = field.state.meta.errors.length > 0
 
               return (
                 <div className="flex flex-col gap-1.5">
@@ -283,11 +280,9 @@ export function CreateQuestDialog({ guild }: CreateQuestDialogProps = {}) {
             >
               Cancel
             </Button>
-            <form.Subscribe
-              selector={(state) => [state.canSubmit, state.isSubmitting]}
-            >
-              {([canSubmit, isSubmitting]) => (
-                <Button type="submit" disabled={!canSubmit || isSubmitting}>
+            <form.Subscribe selector={(state) => state.isSubmitting}>
+              {(isSubmitting) => (
+                <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? 'Creating...' : 'Create Quest'}
                 </Button>
               )}
