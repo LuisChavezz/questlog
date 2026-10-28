@@ -156,7 +156,7 @@ Auth wiring: `lib/auth.ts` (server) ↔ `lib/auth-client.ts` (browser) — the c
 
 ### Testing
 
-53 test files (52 under `src/` plus `scripts/build-avatars.test.ts`), Vitest 4. There is **no global Vitest config**: each file declares its environment with a line-1 pragma — `// @vitest-environment node` for handlers and logic, `// @vitest-environment jsdom` for components and hooks.
+54 test files (53 under `src/` plus `scripts/build-avatars.test.ts`), Vitest 4. There is **no global Vitest config**: each file declares its environment with a line-1 pragma — `// @vitest-environment node` for handlers and logic, `// @vitest-environment jsdom` for components and hooks.
 
 - `src/test/drizzle-stub.ts` is a chainable, _thenable_ Drizzle fake. Mock with `vi.mock('#/db', async () => ({ db: (await import('#/test/drizzle-stub')).dbStub }))`, then `enqueueSelect/Update/Insert/Delete` results in the order the handler issues its queries (one queue per operation; `transaction(cb)` calls `cb(dbStub)`, so locked reads share the queues). `enqueueError('update', err)` simulates an engine failure mid-sequence — that's how the deadlock paths are covered.
 - `getDbCalls()` returns `{ op, table, set, values, where, orderBy, locked, returning }` per operation, which is how tests assert on things absent from the return value: that a re-read used `.for('update')`, what the audit log wrote, the `WHERE` scope of a DELETE, or that a paginated query carried its tiebreaker.

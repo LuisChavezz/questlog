@@ -122,14 +122,9 @@ export function GuildProfileForm({
         {({ isSubmitting, values }) => {
           const changed = hasChanges(values)
           return (
-            <div className="flex items-center gap-3">
-              <Button
-                type="submit"
-                className="w-fit"
-                disabled={isSubmitting || !changed}
-              >
-                {isSubmitting ? 'Saving…' : 'Save Changes'}
-              </Button>
+            // Acción alineada a la derecha, como el Save del Settings dialog del
+            // usuario; la confirmación queda junto al botón que la produjo
+            <div className="flex items-center justify-end gap-3">
               {/* La confirmación se retira en cuanto el usuario vuelve a tocar
                   algo: con cambios sin guardar en pantalla, un "Saved" colgado
                   diría justo lo contrario de lo que hay en la BD. */}
@@ -138,6 +133,9 @@ export function GuildProfileForm({
                   Guild profile saved.
                 </p>
               )}
+              <Button type="submit" disabled={isSubmitting || !changed}>
+                {isSubmitting ? 'Saving…' : 'Save Changes'}
+              </Button>
             </div>
           )
         }}
